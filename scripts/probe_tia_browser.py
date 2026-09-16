@@ -15,95 +15,95 @@ def compact(value: str, limit: int = 5000) -> str:
 
 
 async def visible_rows(page):
+    out = []
     tables = page.locator("table:visible")
-    found = []
     for i in range(await tables.count()):
         rows = tables.nth(i).locator("tbody tr")
-        if await rows.count() == 0:
-            continue
         for j in range(await rows.count()):
             cells = [x.strip() for x in await rows.nth(j).locator("td").all_inner_texts()]
             if cells:
-                found.append(cells)
-    return found
-
-
-async def active_tabs(page):
-    links = page.locator("a.nav-link")
-    out = []
-    for i in range(await links.count()):
-        a = links.nth(i)
-        out.append({
-            "i": i,
-            "text": compact(await a.inner_text(), 80),
-            "class": await a.get_attribute("class"),
-            "outer": compact(await a.evaluate("el => el.outerHTML"), 900),
-        })
+                out.append(cells)
     return out
 
 
-async def wait_for_terminal_state(page, terminal_num: str, timeout_s: int = 14):
-    history = []
-    for second in range(timeout_s):
-        await page.wait_for_timeout(1000)
-        rows = await visible_rows(page)
-        body = compact(await page.locator("body").inner_text(), 500)
-        matching = [r for r in rows if len(r) >= 5 and r[4].strip() == terminal_num]
-        history.append((second + 1, len(rows), len(matching), body[:180]))
-        if matching:
-            return matching, history
-    return [], history
+async def wait_terminal(page, terminal_num: str):
+    for _ in range(20):
+        rows = [r for r in await visible_rows(page) if len(r) >= 5 and r[4] == terminal_num]
+        if rows:
+            return rows
+        await page.wait_for_timeout(700)
+    return []
 
 
-async def probe(page, direction: str, url: str) -> None:
-    print(f"\n=== PROBE {direction.upper()} {url} ===", flush=True)
+async def pager_dump(page):
+    pagers = page.locator(".k-pager:visible")
+    data = []
+    for i in range(await pagers.count()):
+        p = pagers.nth(i)
+        data.append({
+            "text": compact(await p.inner_text(), 1000),
+            "html": compact(await p.evaluate("el => el.outerHTML"), 4000),
+        })
+    return data
+
+
+async def try_next(page, terminal_num: str, first_sig: tuple[str, ...]):
+    selectors = [
+        '.k-pager-nav.k-pager-next:visible',
+        'button[title*="next" i]:visible',
+        'button[aria-label*="next" i]:visible',
+        'button[title*="tiếp" i]:visible',
+        'button[aria-label*="tiếp" i]:visible',
+    ]
+    for sel in selectors:
+        loc = page.locator(sel).first
+        if await loc.count() == 0:
+            continue
+        print("NEXT_CANDIDATE", sel, compact(await loc.evaluate("el => el.outerHTML"), 1200), flush=True)
+        try:
+            await loc.click(timeout=5000)
+        except Exception as exc:
+            print("NEXT_CLICK_ERROR", sel, type(exc).__name__, str(exc)[:200], flush=True)
+            continue
+        for _ in range(15):
+            await page.wait_for_timeout(700)
+            rows = [r for r in await visible_rows(page) if len(r) >= 5 and r[4] == terminal_num]
+            if rows and tuple(rows[0][:5]) != first_sig:
+                return rows
+        return []
+    return []
+
+
+async def probe(page, direction: str, url: str):
+    print(f"\n=== {direction.upper()} ===", flush=True)
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-    await page.wait_for_timeout(10000)
-
-    print("TITLE", await page.title(), flush=True)
-    print("NAV_INITIAL", await active_tabs(page), flush=True)
-    initial_rows = await visible_rows(page)
-    print("INITIAL_ROWS", len(initial_rows), initial_rows[:3], flush=True)
-    print("INITIAL_BODY", compact(await page.locator("body").inner_text(), 1400), flush=True)
+    await page.wait_for_timeout(9000)
 
     for terminal, terminal_num in TERMINALS:
-        print(f"\n--- SWITCH {direction.upper()} {terminal} ---", flush=True)
-        links = page.locator("a.nav-link")
-        target = links.filter(has_text=terminal).first
+        target = page.locator("a.nav-link").filter(has_text=terminal).first
         if await target.count() == 0:
-            print("TARGET_NOT_FOUND", terminal, flush=True)
+            print("NO_TERMINAL", terminal, flush=True)
             continue
-
-        print("TARGET_BEFORE", compact(await target.evaluate("el => el.outerHTML"), 1200), flush=True)
         try:
             await target.click(timeout=5000)
-        except Exception as exc:
-            print("CLICK_ERROR", type(exc).__name__, str(exc)[:300], flush=True)
+        except Exception:
             await target.evaluate("el => el.click()")
-
-        matching, history = await wait_for_terminal_state(page, terminal_num)
-        print("SWITCH_HISTORY", history, flush=True)
-        print("NAV_AFTER", await active_tabs(page), flush=True)
-        rows = await visible_rows(page)
-        print("ROWS_AFTER", len(rows), rows[:20], flush=True)
-        print("MATCHING_TERMINAL", terminal, len(matching), matching[:10], flush=True)
-        print("BODY_AFTER", compact(await page.locator("body").inner_text(), 2200), flush=True)
+        rows = await wait_terminal(page, terminal_num)
+        print("TERMINAL", terminal, "ROWS", len(rows), "FIRST", rows[:2], flush=True)
+        print("PAGER", await pager_dump(page), flush=True)
+        if rows:
+            second = await try_next(page, terminal_num, tuple(rows[0][:5]))
+            print("PAGE2_ROWS", terminal, len(second), "FIRST", second[:2], flush=True)
 
 
-async def main() -> None:
+async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            locale="vi-VN",
-            timezone_id="Asia/Ho_Chi_Minh",
-            viewport={"width": 1440, "height": 1000},
-        )
+        context = await browser.new_context(locale="vi-VN", timezone_id="Asia/Ho_Chi_Minh", viewport={"width": 1440, "height": 1000})
         for direction, url in URLS:
             page = await context.new_page()
             try:
                 await probe(page, direction, url)
-            except Exception as exc:
-                print(f"PROBE_ERROR {url} {type(exc).__name__}: {exc}", flush=True)
             finally:
                 await page.close()
         await browser.close()
