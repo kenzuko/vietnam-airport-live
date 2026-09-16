@@ -21,7 +21,7 @@
 </header>
 <main class="subpage">
   <section class="subhero">
-    <div><span class="section-kicker">SGN · THỐNG KÊ</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp các chuyến hệ thống đã quan sát trong ngày, dùng để nhìn cơ cấu đường bay, khung giờ, nhà ga và mức độ thay đổi giờ.</p></div>
+    <div><span class="section-kicker">SGN · THỐNG KÊ</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp các chuyến hệ thống đã quan sát để nhìn nhịp khai thác, cơ cấu nội địa - quốc tế, hãng bay, tuyến bay và mức độ thay đổi giờ.</p></div>
     <div id="coverageNote" class="coverage-note">Đang tải phạm vi dữ liệu...</div>
   </section>
   <section class="metric-grid">
@@ -31,10 +31,34 @@
     <article><span>Quốc tế</span><strong id="aInternational">-</strong></article>
     <article><span>Trễ trên 15 phút</span><strong id="aDelayed">-</strong></article>
   </section>
+
   <section class="section-card">
     <span class="section-kicker">TÓM TẮT KHAI THÁC</span><h2>Báo cáo nhanh hôm nay</h2>
     <div id="reportBox" class="report-box">Đang tổng hợp...</div>
   </section>
+
+  <div class="analytics-split">
+    <section class="section-card">
+      <span class="section-kicker">CƠ CẤU KHAI THÁC</span><h2>Nội địa và quốc tế</h2>
+      <div id="marketBars" class="bar-list"></div>
+    </section>
+    <section class="section-card">
+      <span class="section-kicker">ĐỘ TRỄ THEO NHÀ GA</span><h2>T1 / T2 / T3</h2>
+      <div id="terminalDelayBars" class="bar-list"></div>
+    </section>
+  </div>
+
+  <div class="analytics-split">
+    <section class="section-card">
+      <span class="section-kicker">HÃNG BAY</span><h2>Hãng xuất hiện nhiều trong dữ liệu</h2>
+      <div id="airlineBars" class="bar-list"></div>
+    </section>
+    <section class="section-card">
+      <span class="section-kicker">QUỐC TẾ</span><h2>Tuyến quốc tế xuất hiện nhiều</h2>
+      <div id="internationalRouteBars" class="bar-list"></div>
+    </section>
+  </div>
+
   <section class="section-card">
     <span class="section-kicker">ĐƯỜNG BAY</span><h2>Điểm đi / đến xuất hiện nhiều</h2>
     <div id="routeBars" class="bar-list"></div>
@@ -49,6 +73,6 @@
   </section>
 </main>
 <nav class="mobile-nav"><a href="./"><span>●</span>Trực tiếp</a><a href="./#flightBoard"><span>✈</span>Chuyến bay</a><a class="active" href="./analytics.html"><span>▥</span>Thống kê</a><a href="./history.html"><span>◷</span>Lịch sử</a></nav>
-<script src="./analytics.js?v=20260916h"></script>
+<script src="./analytics.js?v=20260916i"></script>
 </body>
 </html>
