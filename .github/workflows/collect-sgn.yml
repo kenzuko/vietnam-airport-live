@@ -21,10 +21,12 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,8 +37,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Collect official SGN data
+      - name: Collect SGN live data
         run: python scripts/collect_sgn.py
+
+      - name: Build daily observed archive
+        run: python scripts/build_sgn_day.py
 
       - name: Sanitize public metadata
         run: |
@@ -44,25 +49,28 @@ jobs:
           import json
           from pathlib import Path
 
-          path = Path('data/sgn.json')
-          data = json.loads(path.read_text(encoding='utf-8'))
-          data['source'] = 'Live airport data'
-          for flight in data.get('flights', []):
-              flight['source'] = 'Live airport data'
-          path.write_text(
-              json.dumps(data, ensure_ascii=False, separators=(',', ':')),
-              encoding='utf-8'
-          )
+          paths = [Path('data/sgn.json'), Path('data/sgn-day.json')]
+          paths += list(Path('data/history').glob('*.json')) if Path('data/history').exists() else []
+          for path in paths:
+              if not path.exists():
+                  continue
+              data = json.loads(path.read_text(encoding='utf-8'))
+              if 'source' in data:
+                  data['source'] = 'Live airport data'
+              for flight in data.get('flights', []):
+                  if 'source' in flight:
+                      flight['source'] = 'Live airport data'
+              path.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
           PY
 
       - name: Commit refreshed dataset
         run: |
-          if git diff --quiet -- data/sgn.json; then
+          if git diff --quiet -- data; then
             echo 'No dataset change.'
             exit 0
           fi
           git config user.name 'vietnam-airport-live-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add data/sgn.json
-          git commit -m 'data: refresh SGN live flights'
+          git add data
+          git commit -m 'data: refresh SGN live and daily archive'
           git push
