@@ -3,50 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0d0f0e">
+  <meta name="theme-color" content="#f5f3eb">
   <title>Vietnam Airport Live - Thống kê SGN</title>
   <link rel="canonical" href="https://val.openphuquoc.com/analytics.html">
   <link rel="stylesheet" href="./style.css?v=20260916g">
+  <link rel="stylesheet" href="./theme-light.css?v=20260916a">
 </head>
 <body>
 <header class="topbar">
   <a class="brand" href="./">
-    <img class="brand-logo" src="https://raw.githubusercontent.com/kenzuko/Jotrip-Airport/main/jotrip-logo-wordmark.svg" alt="JoTrip">
+    <img class="brand-logo" src="./assets/jotrip-logo.svg" alt="JoTrip">
     <span class="brand-divider"></span>
     <span class="brand-copy"><strong>Vietnam Airport Live</strong><small>SGN · Tân Sơn Nhất</small></span>
   </a>
-  <nav class="desktop-nav"><a href="./">LIVE</a><a class="active" href="./analytics.html">THỐNG KÊ</a><a href="./history.html">LỊCH SỬ</a></nav>
+  <nav class="desktop-nav"><a href="./">TRỰC TIẾP</a><a class="active" href="./analytics.html">THỐNG KÊ</a><a href="./history.html">LỊCH SỬ</a></nav>
 </header>
 <main class="subpage">
   <section class="subhero">
-    <div><span class="section-kicker">SGN · ANALYTICS</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp từ các chuyến hệ thống đã ghi nhận trong ngày, tách biệt với cửa sổ live đang hiển thị.</p></div>
-    <div id="coverageNote" class="coverage-note">Đang tải độ phủ dữ liệu...</div>
+    <div><span class="section-kicker">SGN · THỐNG KÊ</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp từ các chuyến hệ thống đã ghi nhận trong ngày. Số liệu này được tích lũy theo thời gian và khác với danh sách chuyến đang hiển thị ở trang Trực tiếp.</p></div>
+    <div id="coverageNote" class="coverage-note">Đang tải phạm vi dữ liệu...</div>
   </section>
   <section class="metric-grid">
     <article><span>Đã ghi nhận</span><strong id="aTotal">-</strong></article>
     <article><span>Chuyến đến</span><strong id="aArrivals">-</strong></article>
     <article><span>Chuyến đi</span><strong id="aDepartures">-</strong></article>
     <article><span>Quốc tế</span><strong id="aInternational">-</strong></article>
-    <article><span>Trễ &gt;15'</span><strong id="aDelayed">-</strong></article>
+    <article><span>Trễ trên 15 phút</span><strong id="aDelayed">-</strong></article>
   </section>
   <section class="section-card">
-    <span class="section-kicker">OPERATIONS BRIEF</span><h2>Báo cáo nhanh hôm nay</h2>
+    <span class="section-kicker">TÓM TẮT KHAI THÁC</span><h2>Báo cáo nhanh hôm nay</h2>
     <div id="reportBox" class="report-box">Đang tổng hợp...</div>
   </section>
   <section class="section-card">
-    <span class="section-kicker">ROUTES</span><h2>Điểm đi / đến được ghi nhận nhiều</h2>
+    <span class="section-kicker">ĐƯỜNG BAY</span><h2>Điểm đi / đến được ghi nhận nhiều</h2>
     <div id="routeBars" class="bar-list"></div>
   </section>
   <section class="section-card">
-    <span class="section-kicker">TIME BANKS</span><h2>Phân bố chuyến theo giờ</h2>
+    <span class="section-kicker">KHUNG GIỜ</span><h2>Phân bố chuyến theo giờ</h2>
     <div id="hourGrid" class="hour-grid"></div>
   </section>
   <section class="section-card">
-    <span class="section-kicker">TERMINALS</span><h2>Phân bố theo nhà ga</h2>
+    <span class="section-kicker">NHÀ GA</span><h2>Phân bố theo nhà ga</h2>
     <div id="terminalBars" class="bar-list"></div>
   </section>
 </main>
-<nav class="mobile-nav"><a href="./"><span>●</span>Live</a><a href="./#flightBoard"><span>✈</span>Flights</a><a class="active" href="./analytics.html"><span>▥</span>Stats</a><a href="./history.html"><span>◷</span>History</a></nav>
-<script src="./analytics.js?v=20260916g"></script>
+<nav class="mobile-nav"><a href="./"><span>●</span>Trực tiếp</a><a href="./#flightBoard"><span>✈</span>Chuyến bay</a><a class="active" href="./analytics.html"><span>▥</span>Thống kê</a><a href="./history.html"><span>◷</span>Lịch sử</a></nav>
+<script src="./analytics.js?v=20260916h"></script>
 </body>
 </html>
