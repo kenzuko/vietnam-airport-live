@@ -1,0 +1,32 @@
+name: Probe TIA browser network
+
+on:
+  push:
+    paths:
+      - 'scripts/probe_tia_browser.py'
+      - '.github/workflows/probe-tia-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install chromium
+
+      - name: Probe current TIA app
+        run: python scripts/probe_tia_browser.py
