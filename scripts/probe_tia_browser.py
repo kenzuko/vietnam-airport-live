@@ -4,70 +4,68 @@ import asyncio
 from playwright.async_api import async_playwright
 
 URLS = [
-    "https://tia.vietnamairport.vn/ArrDom",
-    "https://tia.vietnamairport.vn/DepDom",
+    ("arrival", "https://tia.vietnamairport.vn/ArrDom"),
+    ("departure", "https://tia.vietnamairport.vn/DepDom"),
 ]
-
-STATIC_SUFFIXES = (".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2", ".ico")
-
-
-def interesting(url: str) -> bool:
-    low = url.lower().split("?", 1)[0]
-    if low.endswith(STATIC_SUFFIXES):
-        return False
-    return "tia.vietnamairport.vn" in low
+TERMINALS = ("T1", "T3", "T2")
 
 
-async def probe(page, url: str) -> None:
-    print(f"\n=== PROBE {url} ===", flush=True)
-
-    async def on_request(req):
-        if interesting(req.url):
-            print(f"REQ {req.method} {req.resource_type} {req.url}", flush=True)
-            if req.method not in {"GET", "HEAD"}:
-                try:
-                    body = req.post_data
-                    if body:
-                        print(f"REQ_BODY {_compact(body, 1200)}", flush=True)
-                except Exception:
-                    pass
-
-    async def on_response(res):
-        if interesting(res.url):
-            ct = res.headers.get("content-type", "")
-            print(f"RES {res.status} {ct[:80]} {res.url}", flush=True)
-
-    def on_websocket(ws):
-        print(f"WS OPEN {ws.url}", flush=True)
-        ws.on("framesent", lambda payload: print(f"WS SENT {_compact(str(payload), 500)}", flush=True))
-        ws.on("framereceived", lambda payload: print(f"WS RECV {_compact(str(payload), 500)}", flush=True))
-        ws.on("close", lambda: print(f"WS CLOSE {ws.url}", flush=True))
-
-    page.on("request", on_request)
-    page.on("response", on_response)
-    page.on("websocket", on_websocket)
-
-    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-    await page.wait_for_timeout(10000)
-
-    print("TITLE", await page.title(), flush=True)
-    print("FINAL_URL", page.url, flush=True)
-    body_text = await page.locator("body").inner_text()
-    print("BODY_TEXT", _compact(body_text, 8000), flush=True)
-
-    links = await page.locator("a").evaluate_all(
-        "els => els.map(a => ({text:(a.innerText||'').trim(), href:a.getAttribute('href'), cls:a.className}))"
-    )
-    print("LINKS", _compact(str(links), 5000), flush=True)
-
-    buttons = await page.locator("button").evaluate_all(
-        "els => els.map(b => ({text:(b.innerText||'').trim(), type:b.type, cls:b.className}))"
-    )
-    print("BUTTONS", _compact(str(buttons), 5000), flush=True)
-
-
-def _compact(value: str, limit: int) -> str:
+def compact(value: str, limit: int = 6000) -> str:
     return " ".join(value.split())[:limit]
+
+
+async def dump_tables(page, direction: str, terminal: str) -> None:
+    print(f"\n--- {direction.upper()} {terminal} ---", flush=True)
+    print("BODY", compact(await page.locator("body").inner_text(), 9000), flush=True)
+
+    tables = page.locator("table")
+    count = await tables.count()
+    print(f"TABLE_COUNT {count}", flush=True)
+    for i in range(count):
+        table = tables.nth(i)
+        if not await table.is_visible():
+            continue
+        headers = await table.locator("thead th").all_inner_texts()
+        rows = table.locator("tbody tr")
+        row_count = await rows.count()
+        print(f"TABLE {i} HEADERS={headers} ROWS={row_count}", flush=True)
+        for j in range(min(row_count, 20)):
+            cells = await rows.nth(j).locator("td").all_inner_texts()
+            print(f"ROW {i}:{j} {cells}", flush=True)
+
+    grids = page.locator(".k-grid")
+    print(f"GRID_COUNT {await grids.count()}", flush=True)
+    for i in range(await grids.count()):
+        grid = grids.nth(i)
+        if await grid.is_visible():
+            print(f"GRID {i} TEXT={compact(await grid.inner_text(), 5000)}", flush=True)
+
+
+async def select_terminal(page, terminal: str) -> None:
+    links = page.locator("a.nav-link")
+    target = links.filter(has_text=terminal).first
+    if await target.count() == 0:
+        raise RuntimeError(f"terminal link {terminal} not found")
+    before = await target.get_attribute("class")
+    print(f"CLICK {terminal} class_before={before}", flush=True)
+    await target.click()
+    await page.wait_for_timeout(2500)
+    after = await target.get_attribute("class")
+    print(f"CLICK {terminal} class_after={after}", flush=True)
+
+
+async def probe(page, direction: str, url: str) -> None:
+    print(f"\n=== PROBE {direction.upper()} {url} ===", flush=True)
+    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    await page.wait_for_timeout(8000)
+    print("TITLE", await page.title(), flush=True)
+
+    for terminal in TERMINALS:
+        try:
+            await select_terminal(page, terminal)
+            await dump_tables(page, direction, terminal)
+        except Exception as exc:
+            print(f"TERMINAL_ERROR {direction} {terminal} {type(exc).__name__}: {exc}", flush=True)
 
 
 async def main() -> None:
@@ -78,10 +76,10 @@ async def main() -> None:
             timezone_id="Asia/Ho_Chi_Minh",
             viewport={"width": 1440, "height": 1000},
         )
-        for url in URLS:
+        for direction, url in URLS:
             page = await context.new_page()
             try:
-                await probe(page, url)
+                await probe(page, direction, url)
             except Exception as exc:
                 print(f"PROBE_ERROR {url} {type(exc).__name__}: {exc}", flush=True)
             finally:
