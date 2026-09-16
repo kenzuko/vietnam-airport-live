@@ -3,32 +3,40 @@ from __future__ import annotations
 import json
 import re
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import requests
+from tia_source import fetch_tia
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "sgn.json"
-AIRPORT = "SGN"
-TERMINALS = ("T1", "T2", "T3")
-DIRECTIONS = ("arrival", "departure")
-PAGE_SIZE = 100
-MAX_PAGES = 5
-TIMEOUT = (4, 8)
 
 AIRLINES = {
-    "VN": "Vietnam Airlines", "VJ": "VietJet Air", "VU": "Vietravel Airlines",
-    "QH": "Bamboo Airways", "BL": "Pacific Airlines", "SQ": "Singapore Airlines",
-    "TG": "Thai Airways", "AK": "AirAsia", "FD": "Thai AirAsia", "TR": "Scoot",
-    "KE": "Korean Air", "OZ": "Asiana Airlines", "CX": "Cathay Pacific",
-    "BR": "EVA Air", "CI": "China Airlines", "CZ": "China Southern",
-    "MU": "China Eastern", "CA": "Air China", "JL": "Japan Airlines",
-    "NH": "ANA", "QR": "Qatar Airways", "EK": "Emirates",
+    "VN": "Vietnam Airlines",
+    "VJ": "VietJet Air",
+    "VU": "Vietravel Airlines",
+    "QH": "Bamboo Airways",
+    "BL": "Pacific Airlines",
+    "SQ": "Singapore Airlines",
+    "TG": "Thai Airways",
+    "AK": "AirAsia",
+    "FD": "Thai AirAsia",
+    "TR": "Scoot",
+    "KE": "Korean Air",
+    "OZ": "Asiana Airlines",
+    "CX": "Cathay Pacific",
+    "BR": "EVA Air",
+    "CI": "China Airlines",
+    "CZ": "China Southern",
+    "MU": "China Eastern",
+    "CA": "Air China",
+    "JL": "Japan Airlines",
+    "NH": "ANA",
+    "QR": "Qatar Airways",
+    "EK": "Emirates",
 }
 
 
@@ -56,7 +64,7 @@ def flight_no(value: Any) -> str | None:
 
 
 def airline_name(number: str | None, raw: dict[str, Any]) -> str | None:
-    explicit = clean(first(raw, "airline", "airlineName", "hangHangKhong", "tenHangHangKhong"))
+    explicit = clean(first(raw, "Airline", "AirlineName", "airline", "airlineName"))
     if explicit:
         return explicit
     if not number:
@@ -73,16 +81,16 @@ def normalize_hhmm(value: Any) -> str | None:
     if matches:
         h, m = matches[-1]
         return f"{int(h):02d}:{m}"
-    return text
+    return None
 
 
-def delay_minutes(scheduled: str | None, estimated: str | None) -> int | None:
-    if not scheduled or not estimated:
+def delay_minutes(scheduled: str | None, effective: str | None) -> int | None:
+    if not scheduled or not effective:
         return None
-    if not re.fullmatch(r"\d{2}:\d{2}", scheduled) or not re.fullmatch(r"\d{2}:\d{2}", estimated):
+    if not re.fullmatch(r"\d{2}:\d{2}", scheduled) or not re.fullmatch(r"\d{2}:\d{2}", effective):
         return None
     sh, sm = map(int, scheduled.split(":"))
-    eh, em = map(int, estimated.split(":"))
+    eh, em = map(int, effective.split(":"))
     diff = (eh * 60 + em) - (sh * 60 + sm)
     if diff < -720:
         diff += 1440
@@ -91,48 +99,45 @@ def delay_minutes(scheduled: str | None, estimated: str | None) -> int | None:
     return diff
 
 
-def parse_route(raw_route: Any, direction: str) -> tuple[str | None, str | None, str | None]:
-    route = clean(raw_route)
-    if not route:
-        return None, None, None
-    parts = [p.strip() for p in re.split(r"\s*(?:-|–|—|→|>)\s*", route, maxsplit=1) if p.strip()]
-    if len(parts) == 2:
-        origin, destination = parts
-    else:
-        origin = None if direction == "departure" else parts[0]
-        destination = parts[0] if direction == "departure" else None
-    return origin, destination, destination if direction == "departure" else origin
+def terminal_from_raw(raw: dict[str, Any]) -> str | None:
+    value = clean(first(raw, "Terminal", "terminal", "TerminalNo", "TerminalName"))
+    if not value:
+        return None
+    m = re.search(r"\bT?([123])\b", value, flags=re.I)
+    return f"T{m.group(1)}" if m else value.upper()
 
 
-def normalize_acv(raw: dict[str, Any], direction: str, terminal: str) -> dict[str, Any] | None:
-    number = flight_no(first(raw, "soHieuChuyenBay", "flightNo", "flightNumber", "FlightNo"))
-    if not number:
+def normalize_tia(raw: dict[str, Any], direction: str) -> dict[str, Any] | None:
+    number = flight_no(first(raw, "FlightNo", "FlightNumber", "flightNo", "flightNumber"))
+    airport = clean(first(raw, "Airport", "airport", "City", "city"))
+    scheduled = normalize_hhmm(first(raw, "Scheduled", "scheduled"))
+    estimated = normalize_hhmm(first(raw, "Estimated", "estimated"))
+    actual = normalize_hhmm(first(raw, "Actual", "ActualTime", "actual", "actualTime"))
+
+    if not number or not airport or not scheduled:
         return None
 
-    origin, destination, other = parse_route(first(raw, "route", "tuyenBay", "routeName", "Route"), direction)
-    if direction == "departure":
-        scheduled = normalize_hhmm(first(raw, "gioKhoiHanh", "scheduledDeparture", "scheduledTime", "Scheduled"))
-        estimated = normalize_hhmm(first(raw, "gioKhoiHanhDuKien", "estimatedDeparture", "estimatedTime", "Estimated"))
-        actual = normalize_hhmm(first(raw, "gioKhoiHanhThucTe", "actualDeparture", "actualTime", "Actual"))
-    else:
-        scheduled = normalize_hhmm(first(raw, "gioHaCanh", "scheduledArrival", "scheduledTime", "Scheduled"))
-        estimated = normalize_hhmm(first(raw, "gioHaCanhDuKien", "estimatedArrival", "estimatedTime", "Estimated"))
-        actual = normalize_hhmm(first(raw, "gioHaCanhThucTe", "actualArrival", "actualTime", "Actual"))
+    status = clean(first(raw, "RemarkVn", "RemarkVN", "Remark", "Status", "status"))
+    terminal = terminal_from_raw(raw)
+    gate = clean(first(raw, "Gate", "gate", "GateNo", "BoardingGate"))
+    counter = clean(first(raw, "Counter", "counter", "CheckInCounter", "CheckinCounter"))
+    belt = clean(first(raw, "Belt", "belt", "BaggageBelt", "Carousel"))
 
-    status = clean(first(raw, "trangThai", "status", "RemarkVn", "remark"))
-    terminal_value = clean(first(raw, "terminal", "nhaGa", "Terminal")) or terminal
-    gate = clean(first(raw, "gate", "cuaRaMayBay", "Gate"))
-    counter = clean(first(raw, "checkInCounter", "quayThuTuc", "counter", "Counter"))
-    belt = clean(first(raw, "baggageBelt", "bangChuyen", "belt", "Belt"))
+    if direction == "arrival":
+        origin = airport
+        destination = "SGN"
+    else:
+        origin = "SGN"
+        destination = airport
 
     return {
         "direction": direction,
-        "terminal": terminal_value,
+        "terminal": terminal,
         "flight_number": number,
         "airline": airline_name(number, raw),
         "origin": origin,
         "destination": destination,
-        "route_airport": other,
+        "route_airport": airport,
         "scheduled": scheduled,
         "estimated": estimated,
         "actual": actual,
@@ -141,171 +146,149 @@ def normalize_acv(raw: dict[str, Any], direction: str, terminal: str) -> dict[st
         "gate": gate,
         "counter": counter,
         "belt": belt,
-        "is_international": terminal_value.upper() == "T2",
+        "is_international": True if terminal == "T2" else (False if terminal in {"T1", "T3"} else None),
+        "source": "TIA FIDS",
     }
-
-
-def acv_session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "Accept": "*/*",
-        "Content-Type": "application/json",
-        "Accept-Language": "vi;q=0.9,en;q=0.7",
-        "Origin": "https://acv.vn",
-        "Referer": "https://acv.vn/vi/chuyen-bay",
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-    })
-    return s
-
-
-def extract_list(payload: Any) -> list[dict[str, Any]]:
-    if isinstance(payload, list):
-        return [x for x in payload if isinstance(x, dict)]
-    if not isinstance(payload, dict):
-        return []
-    data = payload.get("data")
-    if isinstance(data, list):
-        return [x for x in data if isinstance(x, dict)]
-    if isinstance(data, dict):
-        for key in ("items", "rows", "results", "data", "flights", "Flights"):
-            value = data.get(key)
-            if isinstance(value, list):
-                return [x for x in value if isinstance(x, dict)]
-    for key in ("items", "rows", "results", "flights", "Flights"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return [x for x in value if isinstance(x, dict)]
-    return []
-
-
-def proxy_request(session: requests.Session, payload: dict[str, Any]) -> requests.Response:
-    return session.post(
-        "https://acv.vn/api/proxy",
-        json={"url": "/api/flights/search", "method": "POST", "body": payload},
-        timeout=TIMEOUT,
-    )
-
-
-def warmup(session: requests.Session, direction: str, terminal: str, date: str) -> str:
-    params = {"type": direction, "flightDate": date, "terminal": terminal}
-    params["arrivalStation" if direction == "arrival" else "departureStation"] = AIRPORT
-    try:
-        r = session.get("https://acv.vn/vi/chuyen-bay", params=params, timeout=TIMEOUT)
-        return f"warmup={r.status_code}"
-    except requests.RequestException as exc:
-        return f"warmup={type(exc).__name__}"
-
-
-def fetch_acv() -> tuple[list[dict[str, Any]], list[str]]:
-    session = acv_session()
-    date = now_vn().strftime("%Y-%m-%d")
-    flights: list[dict[str, Any]] = []
-    notes: list[str] = []
-
-    for direction in DIRECTIONS:
-        for terminal in TERMINALS:
-            for page in range(1, MAX_PAGES + 1):
-                payload = {
-                    "flightDate": date,
-                    "pageIndex": page,
-                    "pageSize": PAGE_SIZE,
-                    "langCode": "vi",
-                    "terminal": terminal,
-                    "flightNo": "",
-                    "departureStation": AIRPORT if direction == "departure" else "",
-                    "arrivalStation": AIRPORT if direction == "arrival" else "",
-                    "type": direction,
-                }
-                started = time.monotonic()
-                try:
-                    response = proxy_request(session, payload)
-                    elapsed = time.monotonic() - started
-                    notes.append(f"ACV {direction}/{terminal}/p{page} status={response.status_code} {elapsed:.1f}s")
-
-                    # Some ACV sessions need a page bootstrap. Only pay that cost when necessary.
-                    if response.status_code in (401, 403):
-                        notes.append(f"ACV {direction}/{terminal} {warmup(session, direction, terminal, date)}")
-                        response = proxy_request(session, payload)
-                        notes.append(f"ACV retry {direction}/{terminal}/p{page} status={response.status_code}")
-
-                    response.raise_for_status()
-                    body = response.json()
-                    rows = extract_list(body)
-                    if page == 1 and not rows and isinstance(body, dict):
-                        notes.append(f"ACV {direction}/{terminal} empty keys={','.join(sorted(body.keys()))[:180]}")
-                except (requests.RequestException, ValueError) as exc:
-                    notes.append(f"ACV {direction}/{terminal}/p{page} error={type(exc).__name__}")
-                    break
-
-                if not rows:
-                    break
-                for row in rows:
-                    item = normalize_acv(row, direction, terminal)
-                    if item:
-                        flights.append(item)
-                notes.append(f"ACV {direction}/{terminal}/p{page} rows={len(rows)} normalized={sum(1 for r in rows if normalize_acv(r, direction, terminal))}")
-                if len(rows) < PAGE_SIZE:
-                    break
-                time.sleep(0.1)
-
-    return flights, notes
 
 
 def dedupe(flights: list[dict[str, Any]]) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for f in flights:
-        key = "|".join([f.get("direction") or "", f.get("terminal") or "", f.get("flight_number") or "", f.get("scheduled") or "", f.get("route_airport") or ""])
+        key = "|".join(
+            [
+                f.get("direction") or "",
+                f.get("flight_number") or "",
+                f.get("scheduled") or "",
+                f.get("route_airport") or "",
+            ]
+        )
         if key not in merged:
             merged[key] = f
-        else:
-            merged[key] = {k: (f.get(k) if f.get(k) not in (None, "") else merged[key].get(k)) for k in set(merged[key]) | set(f)}
-    return sorted(merged.values(), key=lambda x: (x.get("scheduled") or "99:99", x.get("flight_number") or ""))
+            continue
+        old = merged[key]
+        merged[key] = {
+            k: (f.get(k) if f.get(k) not in (None, "") else old.get(k))
+            for k in set(old) | set(f)
+        }
+    return sorted(
+        merged.values(),
+        key=lambda x: (x.get("scheduled") or "99:99", x.get("flight_number") or ""),
+    )
+
+
+def direction_overlap(flights: list[dict[str, Any]]) -> float:
+    arrivals = {
+        (f.get("flight_number"), f.get("scheduled"), f.get("route_airport"))
+        for f in flights
+        if f.get("direction") == "arrival"
+    }
+    departures = {
+        (f.get("flight_number"), f.get("scheduled"), f.get("route_airport"))
+        for f in flights
+        if f.get("direction") == "departure"
+    }
+    if len(arrivals) < 5 or len(departures) < 5:
+        return 0.0
+    return len(arrivals & departures) / min(len(arrivals), len(departures))
 
 
 def validate(flights: list[dict[str, Any]]) -> tuple[bool, str]:
     if len(flights) < 20:
         return False, f"too few normalized flights: {len(flights)}"
-    dirs = {f.get("direction") for f in flights}
-    if not {"arrival", "departure"}.issubset(dirs):
-        return False, f"missing direction coverage: {sorted(dirs)}"
-    return True, "ok"
+
+    arrivals = [f for f in flights if f.get("direction") == "arrival"]
+    departures = [f for f in flights if f.get("direction") == "departure"]
+    if len(arrivals) < 8 or len(departures) < 8:
+        return False, f"direction coverage weak: arrivals={len(arrivals)} departures={len(departures)}"
+
+    overlap = direction_overlap(flights)
+    if overlap > 0.75:
+        return False, f"arrival/departure overlap suspicious: {overlap:.0%}"
+
+    valid_time = sum(1 for f in flights if f.get("scheduled")) / len(flights)
+    valid_route = sum(1 for f in flights if f.get("route_airport")) / len(flights)
+    if valid_time < 0.9 or valid_route < 0.9:
+        return False, f"field completeness weak: time={valid_time:.0%} route={valid_route:.0%}"
+
+    return True, f"ok arrivals={len(arrivals)} departures={len(departures)} overlap={overlap:.0%}"
 
 
-def write_dataset(flights: list[dict[str, Any]], notes: list[str], source: str) -> None:
+def write_dataset(
+    flights: list[dict[str, Any]],
+    notes: list[str],
+    source: str,
+    coverage: str,
+) -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     generated = now_vn()
     arrivals = sum(1 for f in flights if f["direction"] == "arrival")
     departures = sum(1 for f in flights if f["direction"] == "departure")
-    delayed = sum(1 for f in flights if (f.get("delay_minutes") or 0) >= 15 or "trễ" in (f.get("status") or "").lower() or "delay" in (f.get("status") or "").lower())
-    terminals = sorted({str(f.get("terminal") or "").upper() for f in flights if f.get("terminal")})
+    delayed = sum(
+        1
+        for f in flights
+        if (f.get("delay_minutes") or 0) >= 15
+        or "trễ" in (f.get("status") or "").lower()
+        or "delay" in (f.get("status") or "").lower()
+    )
+    terminals = sorted(
+        {str(f.get("terminal") or "").upper() for f in flights if f.get("terminal")}
+    )
+
     payload = {
-        "airport": {"iata": "SGN", "icao": "VVTS", "name": "Tan Son Nhat International Airport", "city": "Ho Chi Minh City"},
+        "airport": {
+            "iata": "SGN",
+            "icao": "VVTS",
+            "name": "Tan Son Nhat International Airport",
+            "city": "Ho Chi Minh City",
+        },
         "date": generated.strftime("%Y-%m-%d"),
         "generated_at": generated.isoformat(timespec="seconds"),
         "source": source,
-        "coverage": "full",
-        "summary": {"total": len(flights), "arrivals": arrivals, "departures": departures, "delayed": delayed, "terminals": terminals},
+        "coverage": coverage,
+        "summary": {
+            "total": len(flights),
+            "arrivals": arrivals,
+            "departures": departures,
+            "delayed": delayed,
+            "terminals": terminals,
+        },
         "flights": flights,
-        "collector_notes": notes[-40:],
+        "collector_notes": notes[-50:],
     }
+
     tmp = OUT.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    tmp.write_text(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
     tmp.replace(OUT)
-    print(f"Wrote {len(flights)} flights to {OUT}")
+    print(f"Wrote {len(flights)} flights to {OUT}", flush=True)
 
 
 def main() -> int:
-    print(f"Collecting SGN for {now_vn().isoformat()}", flush=True)
-    flights, notes = fetch_acv()
+    print(f"Collecting SGN via TIA FIDS at {now_vn().isoformat()}", flush=True)
+    flights, notes = fetch_tia(normalize_tia)
     flights = dedupe(flights)
     ok, reason = validate(flights)
-    print(f"ACV normalized={len(flights)} validation={reason}", flush=True)
+
+    print(f"TIA normalized={len(flights)} validation={reason}", flush=True)
     for line in notes:
         print(line, flush=True)
+
     if not ok:
-        print("Upstream dataset rejected. Last known good data will be preserved.", file=sys.stderr, flush=True)
+        print(
+            "TIA dataset rejected. Last known good data will be preserved.",
+            file=sys.stderr,
+            flush=True,
+        )
         return 2
-    write_dataset(flights, notes, "ACV official flight search API")
+
+    write_dataset(
+        flights,
+        notes,
+        source="TIA official FIDS",
+        coverage="current FIDS board",
+    )
     return 0
 
 
