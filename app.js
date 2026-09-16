@@ -1,7 +1,15 @@
 const DATA_SOURCES = [
-  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/main/data/sgn.json', mode: 'fresh' },
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/data-live/data/sgn.json', mode: 'fresh' },
   { url: './data/sgn.json', mode: 'pages-fallback' }
 ];
+
+const AIRLINES = {
+  VN:'Vietnam Airlines', VJ:'VietJet Air', VU:'Vietravel Airlines', QH:'Bamboo Airways', BL:'Pacific Airlines',
+  SQ:'Singapore Airlines', TG:'Thai Airways', AK:'AirAsia', FD:'Thai AirAsia', TR:'Scoot', KE:'Korean Air',
+  OZ:'Asiana Airlines', CX:'Cathay Pacific', BR:'EVA Air', CI:'China Airlines', CZ:'China Southern', MU:'China Eastern',
+  CA:'Air China', JL:'Japan Airlines', NH:'ANA', QR:'Qatar Airways', EK:'Emirates', JQ:'Jetstar', '5J':'Cebu Pacific',
+  TK:'Turkish Airlines', QF:'Qantas', PR:'Philippine Airlines', UA:'United Airlines', AA:'American Airlines', DL:'Delta Air Lines', SK:'SAS'
+};
 
 const state = { data:null, direction:'arrival', terminal:'all', filter:'all', query:'', visibleLimit:30 };
 const $ = id => document.getElementById(id);
@@ -12,6 +20,8 @@ function hhmmToMinutes(value){ if(!/^\d{2}:\d{2}$/.test(value||'')) return null;
 function vnNowParts(){ const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()); return {hour:Number(p.find(x=>x.type==='hour')?.value||0),minute:Number(p.find(x=>x.type==='minute')?.value||0)}; }
 function vnNowMinutes(){ const p=vnNowParts(); return p.hour*60+p.minute; }
 function formatMinuteOfDay(value){ const v=((value%1440)+1440)%1440; return `${String(Math.floor(v/60)).padStart(2,'0')}:${String(v%60).padStart(2,'0')}`; }
+function airlineFromFlight(number=''){ const n=String(number).replace(/\s+/g,'').toUpperCase(); for(const code of Object.keys(AIRLINES).sort((a,b)=>b.length-a.length)){ if(n.startsWith(code))return AIRLINES[code]; } return ''; }
+function airlineLabel(f){ return f?.airline||airlineFromFlight(f?.flight_number)||''; }
 function isCompleted(f){ const s=normalizeText(f.status); return s.includes('da ha canh')||s.includes('da khoi hanh')||s.includes('departed')||s.includes('landed'); }
 function futureDiff(f){ if(isCompleted(f))return null; const t=hhmmToMinutes(f.estimated||f.actual||f.scheduled); if(t==null)return null; let diff=t-vnNowMinutes(); if(diff < -720) diff += 1440; if(diff > 720) diff -= 1440; return diff; }
 function isWithinNextHours(f,hours){ const diff=futureDiff(f); return diff!=null&&diff>=0&&diff<=hours*60; }
@@ -19,7 +29,7 @@ function isWithinNext3Hours(f){ return isWithinNextHours(f,3); }
 function isDelayed(f){ const s=normalizeText(f.status); return Number(f.delay_minutes)>=15||s.includes('tre')||s.includes('delay')||s.includes('late'); }
 function isChanged(f){ return isDelayed(f)||Boolean(f.estimated&&f.estimated!==f.scheduled); }
 function codeshareText(f){ return (Array.isArray(f.flight_numbers)?f.flight_numbers:[]).filter(Boolean).join(' '); }
-function flightSearchText(f){ return normalizeText([f.flight_number,codeshareText(f),f.airline,f.origin,f.destination,f.route_airport,f.status,f.terminal,f.gate,f.counter,f.belt].filter(Boolean).join(' ')); }
+function flightSearchText(f){ return normalizeText([f.flight_number,codeshareText(f),airlineLabel(f),f.origin,f.destination,f.route_airport,f.status,f.terminal,f.gate,f.counter,f.belt].filter(Boolean).join(' ')); }
 function routeLabel(value=''){ const map={'PUDONG- SHANGHAI':'Shanghai Pudong','NARITA-TOKYO':'Tokyo Narita','HANEDA-TOKYO':'Tokyo Haneda','DON MUANG':'Bangkok Don Mueang'}; return map[value]||value; }
 
 function filteredFlights(){
@@ -52,7 +62,8 @@ function flightRow(f){
   const delayLabel=delay!=null&&delay>=10?`<span class="delay-minutes">+${delay} phút</span>`:'';
   const meta=[f.gate?`Cổng ${f.gate}`:null,f.counter?`Quầy ${f.counter}`:null,f.belt?`Băng chuyền ${f.belt}`:null].filter(Boolean).join(' · ');
   const shares=Array.isArray(f.flight_numbers)?f.flight_numbers.filter(n=>n&&n!==f.flight_number):[];
-  const secondary=shares.length?`Liên danh ${shares.slice(0,3).join(', ')}`:(f.airline||'Chuyến bay');
+  const carrier=airlineLabel(f);
+  const secondary=[carrier||null,shares.length?`Liên danh ${shares.slice(0,3).join(', ')}`:null].filter(Boolean).join(' · ')||'Chuyến bay';
   return `<article class="flight-row">
     <div class="flight-time"><strong>${esc(timeMain)}</strong><small>Lịch ${esc(scheduled)}</small></div>
     <div class="flight-main"><strong>${esc(f.flight_number||'-')}</strong><small>${esc(secondary)}</small></div>
@@ -76,7 +87,8 @@ function renderWatch(){
   $('watchCount').textContent=flights.length;
   $('watchList').innerHTML=flights.length?flights.map(f=>{
     const delay=Number(f.delay_minutes); const extra=Number.isFinite(delay)&&delay>=10?` · +${delay} phút`:'';
-    return `<div class="watch-item"><strong>${esc(f.flight_number)} · ${esc(routeLabel(f.route_airport||'-'))}</strong><span>${esc(displayStatus(f))}${esc(extra)}</span></div>`;
+    const carrier=airlineLabel(f); const carrierText=carrier?` · ${carrier}`:'';
+    return `<div class="watch-item"><strong>${esc(f.flight_number)} · ${esc(routeLabel(f.route_airport||'-'))}</strong><span>${esc(displayStatus(f))}${esc(extra)}${esc(carrierText)}</span></div>`;
   }).join(''):`<div class="empty-state">Chưa thấy chuyến nào cần chú ý.</div>`;
 }
 
@@ -119,7 +131,8 @@ function renderNextArrivals(){
     const time=f.estimated||f.scheduled||'--:--';
     const delay=Number(f.delay_minutes);
     const badge=Number.isFinite(delay)&&delay>=10?`<span class="eta-delay">+${delay} phút</span>`:`<span class="eta-ok">${esc(f.terminal||'-')}</span>`;
-    return `<div class="next-arrival"><time>${esc(time)}</time><div><strong>${esc(f.flight_number||'-')} · ${esc(routeLabel(f.route_airport||'-'))}</strong><small>Lịch ${esc(f.scheduled||'-')} · ${esc(f.terminal||'-')}${f.belt?` · Băng chuyền ${esc(f.belt)}`:''}</small></div>${badge}</div>`;
+    const carrier=airlineLabel(f); const carrierText=carrier?` · ${carrier}`:'';
+    return `<div class="next-arrival"><time>${esc(time)}</time><div><strong>${esc(f.flight_number||'-')} · ${esc(routeLabel(f.route_airport||'-'))}</strong><small>Lịch ${esc(f.scheduled||'-')} · ${esc(f.terminal||'-')}${carrierText?esc(carrierText):''}${f.belt?` · Băng chuyền ${esc(f.belt)}`:''}</small></div>${badge}</div>`;
   }).join(''):'<div class="empty-state">Chưa thấy chuyến đến trong vài giờ tới.</div>';
 }
 
