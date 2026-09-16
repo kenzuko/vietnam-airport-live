@@ -13,17 +13,11 @@ BASE = "https://tia.vietnamairport.vn"
 
 SOURCE_CONFIG = {
     "arrival": {
-        "referers": [
-            f"{BASE}/ArrDom",
-            f"{BASE}/arrivals-vn",
-        ],
+        "referers": [f"{BASE}/ArrDom", f"{BASE}/arrivals-vn"],
         "computer": "T2AOSA01A",
     },
     "departure": {
-        "referers": [
-            f"{BASE}/DepDom",
-            f"{BASE}/departures-vn",
-        ],
+        "referers": [f"{BASE}/DepDom", f"{BASE}/departures-vn"],
         "computer": "T2AOSD01A",
     },
 }
@@ -58,12 +52,16 @@ def _session(referer: str) -> requests.Session:
     return s
 
 
+def _compact(text: str, limit: int = 1900) -> str:
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:limit]
+
+
 def _candidate_strings(text: str) -> list[str]:
     candidates: list[str] = []
     seen: set[str] = set()
-
     patterns = [
-        r'''["']([^"']{1,220}(?:api|flight|schedule|arr|dep|dom|int|ajax|getdata|search)[^"']{0,220})["']''',
+        r'''["']([^"']{1,220}(?:api|flight|schedule|arr|dep|dom|int|ajax|getdata|search|blazor)[^"']{0,220})["']''',
         r'''(?:url|action)\s*[:=]\s*["']([^"']+)["']''',
     ]
     for pattern in patterns:
@@ -72,22 +70,55 @@ def _candidate_strings(text: str) -> list[str]:
             if not value or len(value) > 300:
                 continue
             low = value.lower()
-            if any(noise in low for noise in ("bootstrap", "fontawesome", "google", "facebook", "stylesheet")):
+            if any(noise in low for noise in ("fontawesome", "google", "facebook", "stylesheet")):
                 continue
             if value not in seen:
                 seen.add(value)
                 candidates.append(value)
-            if len(candidates) >= 25:
+            if len(candidates) >= 30:
                 return candidates
     return candidates
+
+
+def _html_markers(html: str) -> list[str]:
+    markers: list[str] = []
+    for line in html.splitlines():
+        low = line.lower()
+        if any(
+            key in low
+            for key in (
+                "blazor",
+                "fids",
+                "flight",
+                "search",
+                "arrdom",
+                "depdom",
+                "t1",
+                "t2",
+                "t3",
+                "interactive",
+                "persist",
+                "component",
+            )
+        ):
+            text = _compact(line, 700)
+            if text and text not in markers:
+                markers.append(text)
+            if len(markers) >= 20:
+                break
+    return markers
 
 
 def _discover_assets(session: requests.Session, landing_url: str, html: str, notes: list[str]) -> None:
     notes.append(f"DISCOVERY html_len={len(html)} path={urlparse(landing_url).path}")
 
+    markers = _html_markers(html)
+    for i, marker in enumerate(markers, start=1):
+        notes.append(f"DISCOVERY html_marker_{i}={marker}")
+
     inline_candidates = _candidate_strings(html)
     if inline_candidates:
-        notes.append("DISCOVERY html_candidates=" + " || ".join(inline_candidates[:12]))
+        notes.append("DISCOVERY html_candidates=" + " || ".join(inline_candidates[:16]))
 
     script_srcs = re.findall(r'<script[^>]+src=["\']([^"\']+)["\']', html, flags=re.I)
     notes.append("DISCOVERY scripts=" + " || ".join(script_srcs[-12:]))
@@ -102,15 +133,15 @@ def _discover_assets(session: requests.Session, landing_url: str, html: str, not
         checked += 1
         try:
             r = session.get(script_url, timeout=TIMEOUT)
-            notes.append(f"DISCOVERY js={urlparse(script_url).path} status={r.status_code} len={len(r.text)}")
+            path = urlparse(script_url).path
+            notes.append(f"DISCOVERY js={path} status={r.status_code} len={len(r.text)}")
             if r.status_code != 200:
                 continue
+            if len(r.text) <= 10000:
+                notes.append(f"DISCOVERY js_body={path}: {_compact(r.text)}")
             candidates = _candidate_strings(r.text)
             if candidates:
-                notes.append(
-                    f"DISCOVERY js_candidates={urlparse(script_url).path}: "
-                    + " || ".join(candidates[:15])
-                )
+                notes.append(f"DISCOVERY js_candidates={path}: " + " || ".join(candidates[:15]))
         except requests.RequestException as exc:
             notes.append(f"DISCOVERY js={urlparse(script_url).path} error={type(exc).__name__}")
 
@@ -129,7 +160,6 @@ def _bootstrap(direction: str, notes: list[str]) -> tuple[requests.Session, dict
                 f"TIA {direction} landing={landing.status_code} "
                 f"{time.monotonic()-t0:.1f}s {referer.rsplit('/',1)[-1]}"
             )
-
             if landing.status_code == 200:
                 _discover_assets(s, referer, landing.text, notes)
 
@@ -194,7 +224,6 @@ def fetch_tia(
                     all_flights.append(item)
                     normalized += 1
             notes.append(f"TIA {direction}/p{page} rows={len(rows)} normalized={normalized}")
-
             if len(rows) < 10:
                 break
             time.sleep(0.1)
