@@ -1,6 +1,6 @@
 const DATA_SOURCES = [
-  { url: './data/sgn.json', mode: 'GitHub Pages' },
-  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/main/data/sgn.json', mode: 'GitHub raw fallback' }
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/main/data/sgn.json', mode: 'fresh' },
+  { url: './data/sgn.json', mode: 'pages-fallback' }
 ];
 
 const state = { data:null, direction:'arrival', terminal:'all', filter:'all', query:'', visibleLimit:30 };
@@ -39,9 +39,9 @@ function flightRow(f){
   const scheduled=f.scheduled||'--:--';
   const delay=Number.isFinite(Number(f.delay_minutes))?Number(f.delay_minutes):null;
   const delayLabel=delay!=null&&delay>=10?`<span class="delay-minutes">+${delay} phút</span>`:'';
-  const meta=[f.gate?`Gate ${f.gate}`:null,f.counter?`Quầy ${f.counter}`:null,f.belt?`Belt ${f.belt}`:null].filter(Boolean).join(' · ');
+  const meta=[f.gate?`Cổng ${f.gate}`:null,f.counter?`Quầy ${f.counter}`:null,f.belt?`Băng chuyền ${f.belt}`:null].filter(Boolean).join(' · ');
   const shares=Array.isArray(f.flight_numbers)?f.flight_numbers.filter(n=>n&&n!==f.flight_number):[];
-  const secondary=shares.length?`Codeshare ${shares.slice(0,3).join(', ')}`:(f.airline||'Chuyến bay');
+  const secondary=shares.length?`Liên danh ${shares.slice(0,3).join(', ')}`:(f.airline||'Chuyến bay');
   return `<article class="flight-row">
     <div class="flight-time"><strong>${esc(timeMain)}</strong><small>Lịch ${esc(scheduled)}</small></div>
     <div class="flight-main"><strong>${esc(f.flight_number||'-')}</strong><small>${esc(secondary)}</small></div>
@@ -54,7 +54,7 @@ function flightRow(f){
 function renderBoard(){
   const all=filteredFlights();
   const shown=all.slice(0,state.visibleLimit);
-  $('flightList').innerHTML=shown.length?shown.map(flightRow).join(''):`<div class="empty-state">Không có chuyến phù hợp bộ lọc hiện tại.</div>`;
+  $('flightList').innerHTML=shown.length?shown.map(flightRow).join(''):`<div class="empty-state">Không có chuyến phù hợp với bộ lọc hiện tại.</div>`;
   const more=$('showMoreBtn');
   if(all.length>state.visibleLimit){ more.classList.remove('hidden'); more.textContent=`Xem thêm ${Math.min(30,all.length-state.visibleLimit)} chuyến`; }
   else more.classList.add('hidden');
@@ -66,14 +66,16 @@ function renderWatch(){
   $('watchList').innerHTML=flights.length?flights.map(f=>{
     const delay=Number(f.delay_minutes); const extra=Number.isFinite(delay)&&delay>=10?` · +${delay} phút`:'';
     return `<div class="watch-item"><strong>${esc(f.flight_number)} · ${esc(f.route_airport||'-')}</strong><span>${esc(displayStatus(f))}${esc(extra)}</span></div>`;
-  }).join(''):`<div class="empty-state">Chưa thấy thay đổi đáng chú ý.</div>`;
+  }).join(''):`<div class="empty-state">Chưa thấy chuyến nào cần chú ý.</div>`;
 }
 
 function ageInfo(generatedAt){
-  if(!generatedAt)return{minutes:Infinity,label:'Chưa có dữ liệu'};
-  const t=new Date(generatedAt).getTime(); if(!Number.isFinite(t))return{minutes:Infinity,label:'Không rõ'};
+  if(!generatedAt)return{minutes:Infinity,label:'chưa có dữ liệu'};
+  const t=new Date(generatedAt).getTime(); if(!Number.isFinite(t))return{minutes:Infinity,label:'không rõ'};
   const mins=Math.max(0,Math.round((Date.now()-t)/60000));
-  if(mins<1)return{minutes:mins,label:'vừa cập nhật'}; if(mins<60)return{minutes:mins,label:`${mins} phút`}; return{minutes:mins,label:`${Math.floor(mins/60)}g ${mins%60}p`};
+  if(mins<1)return{minutes:mins,label:'vừa cập nhật'};
+  if(mins<60)return{minutes:mins,label:`${mins} phút`};
+  return{minutes:mins,label:`${Math.floor(mins/60)} giờ ${mins%60} phút`};
 }
 
 function firstSeenLabel(value){
@@ -91,33 +93,39 @@ function renderSummary(){
   $('arrivalsCount').textContent=s.arrivals??0;
   $('departuresCount').textContent=s.departures??0;
   $('delayedCount').textContent=s.delayed??0;
-  $('todayCoverage').textContent=day.complete_day?'đủ chu kỳ từ đầu ngày':firstSeenLabel(day.first_seen_at);
+  $('todayCoverage').textContent=day.complete_day?'đã ghi nhận từ đầu ngày':firstSeenLabel(day.first_seen_at);
 
   const total=feedTotal, delayed=Number(s.delayed)||0, ratio=total?delayed/total:0;
-  if(!total){$('opsState').textContent='WAITING';$('opsDetail').textContent='Chờ đồng bộ dữ liệu';}
-  else if(ratio>=.18){$('opsState').textContent='WATCH';$('opsDetail').textContent=`${delayed} chuyến đang có thay đổi`;}
-  else if(delayed>0){$('opsState').textContent='ACTIVE';$('opsDetail').textContent=`${delayed} chuyến cần chú ý`;}
-  else{$('opsState').textContent='NORMAL';$('opsDetail').textContent='Chưa thấy trễ đáng kể trong feed';}
+  if(!total){$('opsState').textContent='ĐANG CHỜ';$('opsDetail').textContent='Chờ đồng bộ dữ liệu';}
+  else if(ratio>=.18){$('opsState').textContent='CẦN CHÚ Ý';$('opsDetail').textContent=`${delayed} chuyến đang trễ hoặc đổi giờ`;}
+  else if(delayed>0){$('opsState').textContent='CÓ THAY ĐỔI';$('opsDetail').textContent=`${delayed} chuyến cần chú ý`;}
+  else{$('opsState').textContent='BÌNH THƯỜNG';$('opsDetail').textContent='Chưa thấy trễ đáng kể trong dữ liệu hiện tại';}
 
   $('coverage').textContent=`${feedTotal} chuyến`;
   $('terminals').textContent=(s.terminals||[]).join(', ')||'-';
   const age=ageInfo(d?.generated_at);
   $('dataAge').textContent=age.label;
-  $('updatedAt').textContent=d?.generated_at?`Cập nhật ${age.label} trước`:'Chưa đồng bộ';
+  $('updatedAt').textContent=d?.generated_at?(age.minutes<1?'Dữ liệu vừa cập nhật':`Dữ liệu cách đây ${age.label}`):'Chưa đồng bộ';
 
   const pill=$('healthPill'); pill.className='health-pill';
-  if(!total){pill.classList.add('loading');pill.innerHTML='<i></i> WAITING';$('qaBadge').textContent='WAIT';$('healthTitle').textContent='WAITING FOR DATA';$('healthDescription').textContent='Chưa nhận được bộ dữ liệu SGN hợp lệ.';$('healthIcon').textContent='⋯';}
-  else if(age.minutes>15){pill.classList.add('stale');pill.innerHTML='<i></i> STALE';$('qaBadge').textContent='STALE';$('healthTitle').textContent='DATA STALE';$('healthDescription').textContent='Dữ liệu cũ hơn 15 phút. Không coi là realtime.';$('healthIcon').textContent='!';}
-  else{pill.innerHTML='<i></i> LIVE';$('qaBadge').textContent='OK';$('healthTitle').textContent='DATA HEALTHY';$('healthDescription').textContent='Luồng SGN đang trong cửa sổ cập nhật cho phép.';$('healthIcon').textContent='✓';}
+  if(!total){pill.classList.add('loading');pill.innerHTML='<i></i> ĐANG CHỜ';$('qaBadge').textContent='CHỜ';$('healthTitle').textContent='CHƯA CÓ DỮ LIỆU';$('healthDescription').textContent='Chưa nhận được bộ dữ liệu SGN hợp lệ.';$('healthIcon').textContent='⋯';}
+  else if(age.minutes>10){pill.classList.add('stale');pill.innerHTML='<i></i> CHẬM CẬP NHẬT';$('qaBadge').textContent='CHẬM';$('healthTitle').textContent='DỮ LIỆU ĐANG CHẬM';$('healthDescription').textContent='Dữ liệu đã cũ hơn 10 phút. Nên kiểm tra lại trước khi sử dụng.';$('healthIcon').textContent='!';}
+  else{pill.innerHTML='<i></i> TRỰC TIẾP';$('qaBadge').textContent='TỐT';$('healthTitle').textContent='DỮ LIỆU ĐANG HOẠT ĐỘNG';$('healthDescription').textContent='Dữ liệu SGN đang được cập nhật bình thường.';$('healthIcon').textContent='✓';}
 }
 
 function setActive(container,key,value){ container.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active',btn.dataset[key]===value)); }
-async function fetchJsonWithTimeout(url,timeoutMs=8000){ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs); try{const sep=url.includes('?')?'&':'?';const res=await fetch(`${url}${sep}t=${Date.now()}`,{cache:'no-store',signal:controller.signal,credentials:'omit'});if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();if(!data||!Array.isArray(data.flights)||!data.summary)throw new Error('Dataset không hợp lệ');return data;}finally{clearTimeout(timer);} }
+async function fetchJsonWithTimeout(url,timeoutMs=7000){ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs); try{const sep=url.includes('?')?'&':'?';const res=await fetch(`${url}${sep}t=${Date.now()}`,{cache:'no-store',signal:controller.signal,credentials:'omit'});if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();if(!data||!Array.isArray(data.flights)||!data.summary)throw new Error('Dữ liệu không hợp lệ');return data;}finally{clearTimeout(timer);} }
 
 async function loadData(){
   $('refreshBtn').disabled=true; $('errorBox').classList.add('hidden'); let lastError=null;
-  for(const source of DATA_SOURCES){try{state.data=await fetchJsonWithTimeout(source.url);renderSummary();renderBoard();renderWatch();$('refreshBtn').disabled=false;return;}catch(err){lastError=err;console.warn('SGN data source failed',source.mode,err);}}
-  $('healthPill').className='health-pill error';$('healthPill').innerHTML='<i></i> ERROR';$('errorBox').textContent=`Không đọc được dữ liệu SGN: ${lastError?.message||'unknown error'}`;$('errorBox').classList.remove('hidden');$('refreshBtn').disabled=false;
+  for(const source of DATA_SOURCES){
+    try{
+      const candidate=await fetchJsonWithTimeout(source.url);
+      if(!state.data || !state.data.generated_at || new Date(candidate.generated_at)>=new Date(state.data.generated_at)) state.data=candidate;
+      renderSummary();renderBoard();renderWatch();$('refreshBtn').disabled=false;return;
+    }catch(err){lastError=err;console.warn('SGN data source failed',source.mode,err);}
+  }
+  $('healthPill').className='health-pill error';$('healthPill').innerHTML='<i></i> LỖI';$('errorBox').textContent=`Không đọc được dữ liệu SGN: ${lastError?.message||'lỗi không xác định'}`;$('errorBox').classList.remove('hidden');$('refreshBtn').disabled=false;
 }
 
 $('directionTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-direction]');if(!btn)return;state.direction=btn.dataset.direction;state.visibleLimit=30;setActive($('directionTabs'),'direction',state.direction);renderBoard();});
@@ -128,4 +136,3 @@ $('showMoreBtn').addEventListener('click',()=>{state.visibleLimit+=30;renderBoar
 $('refreshBtn').addEventListener('click',loadData);
 
 loadData();
-setInterval(loadData,60_000);
