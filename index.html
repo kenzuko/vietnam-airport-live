@@ -3,32 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0d0f0e">
+  <meta name="theme-color" content="#f5f3eb">
   <title>Vietnam Airport Live - Tân Sơn Nhất (SGN)</title>
   <meta name="description" content="Theo dõi chuyến bay đến và đi Tân Sơn Nhất (SGN): giờ dự kiến, độ trễ, nhà ga và trạng thái khai thác.">
   <link rel="canonical" href="https://val.openphuquoc.com/">
   <link rel="stylesheet" href="./style.css?v=20260916g">
+  <link rel="stylesheet" href="./theme-light.css?v=20260916a">
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="./" aria-label="Vietnam Airport Live">
-        <img class="brand-logo" src="https://raw.githubusercontent.com/kenzuko/Jotrip-Airport/main/jotrip-logo-wordmark.svg" alt="JoTrip">
+        <img class="brand-logo" src="./assets/jotrip-logo.svg" alt="JoTrip">
         <span class="brand-divider"></span>
         <span class="brand-copy"><strong>Vietnam Airport Live</strong><small>SGN · Tân Sơn Nhất</small></span>
       </a>
       <nav class="desktop-nav" aria-label="Điều hướng">
-        <a class="active" href="./">LIVE</a>
+        <a class="active" href="./">TRỰC TIẾP</a>
         <a href="./analytics.html">THỐNG KÊ</a>
         <a href="./history.html">LỊCH SỬ</a>
       </nav>
-      <button id="refreshBtn" class="refresh-btn" type="button" aria-label="Làm mới">↻</button>
+      <button id="refreshBtn" class="refresh-btn" type="button" aria-label="Làm mới dữ liệu">↻</button>
     </header>
 
     <main class="page">
       <div class="source-strip">
-        <span id="healthPill" class="health-pill loading"><i></i> LOADING</span>
-        <span class="live-label">SGN LIVE · CHECK 15S</span>
+        <span id="healthPill" class="health-pill loading"><i></i> ĐANG TẢI</span>
+        <span class="live-label">SGN · TỰ ĐỘNG KIỂM TRA 15 GIÂY</span>
         <span id="updatedAt" class="updated-at">-</span>
       </div>
 
@@ -37,18 +38,18 @@
         <div class="hero-copy">
           <div class="eyebrow">SGN · TAN SON NHAT INTERNATIONAL AIRPORT</div>
           <h1>Tân Sơn Nhất<br><span>lúc này</span></h1>
-          <p>Nhìn nhanh tình trạng sân bay, rồi mới đi sâu vào từng chuyến.</p>
+          <p>Xem nhanh chuyến đến, chuyến đi, giờ dự kiến và các chuyến đang trễ tại Tân Sơn Nhất.</p>
         </div>
         <div class="ops-card">
-          <small>OPERATIONS</small>
-          <span id="opsState">CHECKING</span>
+          <small>TÌNH HÌNH KHAI THÁC</small>
+          <span id="opsState">ĐANG KIỂM TRA</span>
           <p id="opsDetail">Đang tổng hợp chuyến bay</p>
         </div>
         <div class="stats-grid">
           <article class="today-stat"><small>HÔM NAY ĐÃ GHI NHẬN</small><strong id="totalFlights">-</strong><span id="todayCoverage">Đang tích lũy dữ liệu</span></article>
-          <article><small>CỬA SỔ LIVE</small><strong id="liveWindowCount">-</strong><span>chuyến đang có trong feed</span></article>
-          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>trong cửa sổ live</span></article>
-          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>trong cửa sổ live</span></article>
+          <article><small>ĐANG HIỂN THỊ</small><strong id="liveWindowCount">-</strong><span>chuyến trong dữ liệu hiện tại</span></article>
+          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>trong dữ liệu hiện tại</span></article>
+          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>trong dữ liệu hiện tại</span></article>
           <article class="attention-stat"><small>CẦN CHÚ Ý</small><strong id="delayedCount">-</strong><span>trễ hoặc thay đổi giờ</span></article>
         </div>
       </section>
@@ -59,7 +60,7 @@
         <div class="main-column">
           <section class="card board-card" id="flightBoard">
             <div class="card-head">
-              <div><span class="kicker">LIVE FLIGHT BOARD</span><h2>Cửa sổ chuyến bay hiện tại</h2><p>Không dùng con số này làm tổng chuyến cả ngày.</p></div>
+              <div><span class="kicker">BẢNG CHUYẾN BAY</span><h2>Các chuyến đang được cập nhật</h2><p>Danh sách này chỉ gồm các chuyến đang có trong dữ liệu trực tiếp, không phải toàn bộ lịch bay trong ngày.</p></div>
               <div class="terminal-tabs" id="terminalTabs">
                 <button class="active" data-terminal="all">Tất cả</button>
                 <button data-terminal="T1">T1</button>
@@ -92,20 +93,20 @@
 
         <aside class="sidebar">
           <section class="card side-card">
-            <div class="side-head"><h3>Operations Watch</h3><span id="watchCount" class="count-pill">0</span></div>
+            <div class="side-head"><h3>Chuyến cần chú ý</h3><span id="watchCount" class="count-pill">0</span></div>
             <div id="watchList" class="watch-list"></div>
           </section>
 
           <section class="card side-card">
-            <div class="side-head"><h3>Data Health</h3><span id="qaBadge" class="qa-badge">...</span></div>
+            <div class="side-head"><h3>Tình trạng dữ liệu</h3><span id="qaBadge" class="qa-badge">...</span></div>
             <div class="health-summary">
               <div id="healthIcon" class="health-icon">⋯</div>
-              <div><strong id="healthTitle">CHECKING</strong><p id="healthDescription">Đang kiểm tra độ mới của dữ liệu.</p></div>
+              <div><strong id="healthTitle">ĐANG KIỂM TRA</strong><p id="healthDescription">Đang kiểm tra độ mới của dữ liệu.</p></div>
             </div>
             <dl class="health-meta">
-              <div><dt>Data age</dt><dd id="dataAge">-</dd></div>
-              <div><dt>Live window</dt><dd id="coverage">-</dd></div>
-              <div><dt>Terminals</dt><dd id="terminals">-</dd></div>
+              <div><dt>Độ mới dữ liệu</dt><dd id="dataAge">-</dd></div>
+              <div><dt>Đang hiển thị</dt><dd id="coverage">-</dd></div>
+              <div><dt>Nhà ga</dt><dd id="terminals">-</dd></div>
             </dl>
           </section>
 
@@ -121,14 +122,14 @@
     </footer>
 
     <nav class="mobile-nav">
-      <a class="active" href="./"><span>●</span>Live</a>
-      <a href="#flightBoard"><span>✈</span>Flights</a>
-      <a href="./analytics.html"><span>▥</span>Stats</a>
-      <a href="./history.html"><span>◷</span>History</a>
+      <a class="active" href="./"><span>●</span>Trực tiếp</a>
+      <a href="#flightBoard"><span>✈</span>Chuyến bay</a>
+      <a href="./analytics.html"><span>▥</span>Thống kê</a>
+      <a href="./history.html"><span>◷</span>Lịch sử</a>
     </nav>
   </div>
 
-  <script src="./app.js?v=20260916g"></script>
+  <script src="./app.js?v=20260916h"></script>
   <script src="./fast-refresh.js?v=20260916a"></script>
 </body>
 </html>
