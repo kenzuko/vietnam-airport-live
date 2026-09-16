@@ -1,11 +1,15 @@
-const DATA_URL = './data/sgn.json';
+const DATA_SOURCES = [
+  { url: './data/sgn.json', mode: 'GitHub Pages' },
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/main/data/sgn.json', mode: 'GitHub raw fallback' }
+];
 
 const state = {
   data: null,
   direction: 'arrival',
   terminal: 'all',
   filter: 'all',
-  query: ''
+  query: '',
+  transport: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -37,7 +41,10 @@ function hhmmToMinutes(value) {
 
 function vnNowMinutes() {
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
   }).formatToParts(new Date());
   const h = Number(parts.find(p => p.type === 'hour')?.value || 0);
   const m = Number(parts.find(p => p.type === 'minute')?.value || 0);
@@ -45,7 +52,7 @@ function vnNowMinutes() {
 }
 
 function isWithinNext3Hours(flight) {
-  const raw = flight.estimated || flight.scheduled;
+  const raw = flight.estimated || flight.actual || flight.scheduled;
   const t = hhmmToMinutes(raw);
   if (t == null) return false;
   const now = vnNowMinutes();
@@ -56,17 +63,31 @@ function isWithinNext3Hours(flight) {
 
 function isDelayed(flight) {
   const status = normalizeText(flight.status);
-  return (Number(flight.delay_minutes) >= 15) || status.includes('tre') || status.includes('delay');
+  return (Number(flight.delay_minutes) >= 15) || status.includes('tre') || status.includes('delay') || status.includes('late');
 }
 
 function isChanged(flight) {
   return isDelayed(flight) || Boolean(flight.estimated && flight.estimated !== flight.scheduled);
 }
 
+function codeshareText(f) {
+  const list = Array.isArray(f.flight_numbers) ? f.flight_numbers : [];
+  return list.filter(Boolean).join(' ');
+}
+
 function flightSearchText(f) {
   return normalizeText([
-    f.flight_number, f.airline, f.origin, f.destination, f.route_airport,
-    f.status, f.terminal, f.gate, f.counter, f.belt
+    f.flight_number,
+    codeshareText(f),
+    f.airline,
+    f.origin,
+    f.destination,
+    f.route_airport,
+    f.status,
+    f.terminal,
+    f.gate,
+    f.counter,
+    f.belt
   ].filter(Boolean).join(' '));
 }
 
@@ -87,30 +108,44 @@ function filteredFlights() {
 function statusClass(f) {
   if (isDelayed(f)) return 'delay';
   const s = normalizeText(f.status);
-  if (s.includes('ha canh') || s.includes('departed') || s.includes('landed') || s.includes('on time')) return 'ok';
+  if (
+    s.includes('ha canh') ||
+    s.includes('khoi hanh') ||
+    s.includes('departed') ||
+    s.includes('landed') ||
+    s.includes('on time')
+  ) return 'ok';
   return '';
 }
 
 function displayStatus(f) {
   if (f.status) return f.status;
   if (f.actual) return f.direction === 'arrival' ? 'Đã hạ cánh' : 'Đã khởi hành';
-  if (f.estimated && f.estimated !== f.scheduled) return 'Updated';
-  return 'Scheduled';
+  if (f.estimated && f.estimated !== f.scheduled) return 'Đã cập nhật giờ';
+  return 'Theo kế hoạch';
 }
 
 function flightRow(f) {
   const route = f.route_airport || (f.direction === 'arrival' ? f.origin : f.destination) || 'Đang cập nhật';
-  const timeMain = f.estimated || f.actual || f.scheduled || '--:--';
+  const timeMain = f.actual || f.estimated || f.scheduled || '--:--';
   const scheduled = f.scheduled || '--:--';
   const delay = Number.isFinite(Number(f.delay_minutes)) ? Number(f.delay_minutes) : null;
   const delayLabel = delay != null && delay >= 10 ? `<span class="delay-minutes">+${delay} phút</span>` : '';
-  const meta = [f.gate ? `Gate ${f.gate}` : null, f.counter ? `Quầy ${f.counter}` : null, f.belt ? `Belt ${f.belt}` : null].filter(Boolean).join(' · ');
+  const meta = [
+    f.gate ? `Gate ${f.gate}` : null,
+    f.counter ? `Quầy ${f.counter}` : null,
+    f.belt ? `Belt ${f.belt}` : null
+  ].filter(Boolean).join(' · ');
+  const shares = Array.isArray(f.flight_numbers)
+    ? f.flight_numbers.filter(n => n && n !== f.flight_number)
+    : [];
+  const secondary = shares.length ? `Codeshare ${shares.slice(0, 3).join(', ')}` : (f.airline || 'Chuyến bay');
 
   return `<article class="flight-row">
     <div class="flight-time"><strong>${esc(timeMain)}</strong><small>Lịch ${esc(scheduled)}</small></div>
-    <div class="flight-main"><strong>${esc(f.flight_number || '-')}</strong><small>${esc(f.airline || 'Hãng bay')}</small></div>
+    <div class="flight-main"><strong>${esc(f.flight_number || '-')}</strong><small>${esc(secondary)}</small></div>
     <div class="flight-route"><strong>${esc(route)}</strong><small>${f.direction === 'arrival' ? 'Đến SGN' : 'Rời SGN'}</small></div>
-    <div class="flight-meta"><span class="terminal-tag">${esc(f.terminal || '-')}</span><small>${esc(meta || 'Thông tin cổng đang cập nhật')}</small></div>
+    <div class="flight-meta"><span class="terminal-tag">${esc(f.terminal || '-')}</span><small>${esc(meta || 'Đang cập nhật cổng/quầy')}</small></div>
     <div class="flight-status"><span class="status-badge ${statusClass(f)}">${esc(displayStatus(f))}</span>${delayLabel}</div>
   </article>`;
 }
@@ -126,7 +161,7 @@ function renderWatch() {
   const flights = (state.data?.flights || [])
     .filter(isChanged)
     .sort((a, b) => (Number(b.delay_minutes) || 0) - (Number(a.delay_minutes) || 0))
-    .slice(0, 7);
+    .slice(0, 8);
   $('watchCount').textContent = flights.length;
   $('watchList').innerHTML = flights.length
     ? flights.map(f => {
@@ -160,7 +195,7 @@ function renderSummary() {
   const ratio = total ? delayed / total : 0;
   if (!total) {
     $('opsState').textContent = 'WAITING';
-    $('opsDetail').textContent = 'Chờ lần đồng bộ đầu tiên';
+    $('opsDetail').textContent = 'Chờ đồng bộ dữ liệu';
   } else if (ratio >= 0.18) {
     $('opsState').textContent = 'WATCH';
     $('opsDetail').textContent = `${delayed} chuyến đang có thay đổi`;
@@ -179,7 +214,7 @@ function renderSummary() {
   const age = ageInfo(d?.generated_at);
   $('dataAge').textContent = age.label;
   $('updatedAt').textContent = d?.generated_at ? `Cập nhật ${age.label} trước` : 'Chưa đồng bộ';
-  $('sourceText').textContent = d?.source || 'SGN data feed';
+  $('sourceText').textContent = `${d?.source || 'SGN data feed'} · ${state.transport || 'loading'}`;
 
   const pill = $('healthPill');
   pill.className = 'health-pill';
@@ -188,14 +223,14 @@ function renderSummary() {
     pill.innerHTML = '<i></i> WAITING';
     $('qaBadge').textContent = 'WAIT';
     $('healthTitle').textContent = 'WAITING FOR DATA';
-    $('healthDescription').textContent = 'Workflow đang chờ lấy bộ dữ liệu SGN đầu tiên.';
+    $('healthDescription').textContent = 'Chưa nhận được bộ dữ liệu SGN hợp lệ.';
     $('healthIcon').textContent = '⋯';
   } else if (age.minutes > 15) {
     pill.classList.add('stale');
     pill.innerHTML = '<i></i> STALE';
     $('qaBadge').textContent = 'STALE';
     $('healthTitle').textContent = 'DATA STALE';
-    $('healthDescription').textContent = 'Dữ liệu đã cũ hơn 15 phút. Không coi là realtime.';
+    $('healthDescription').textContent = 'Dữ liệu cũ hơn 15 phút. Không coi là realtime.';
     $('healthIcon').textContent = '!';
   } else {
     pill.innerHTML = '<i></i> LIVE';
@@ -212,26 +247,53 @@ function setActive(container, selector, key, value) {
   });
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      credentials: 'omit'
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.flights) || !data.summary) {
+      throw new Error('Dataset không hợp lệ');
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadData() {
   $('refreshBtn').disabled = true;
   $('errorBox').classList.add('hidden');
-  try {
-    const res = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!data || !Array.isArray(data.flights)) throw new Error('Dataset không hợp lệ');
-    state.data = data;
-    renderSummary();
-    renderBoard();
-    renderWatch();
-  } catch (err) {
-    $('healthPill').className = 'health-pill error';
-    $('healthPill').innerHTML = '<i></i> ERROR';
-    $('errorBox').textContent = `Không đọc được dữ liệu SGN: ${err.message}`;
-    $('errorBox').classList.remove('hidden');
-  } finally {
-    $('refreshBtn').disabled = false;
+  let lastError = null;
+
+  for (const source of DATA_SOURCES) {
+    try {
+      const data = await fetchJsonWithTimeout(source.url);
+      state.data = data;
+      state.transport = source.mode;
+      renderSummary();
+      renderBoard();
+      renderWatch();
+      $('refreshBtn').disabled = false;
+      return;
+    } catch (err) {
+      lastError = err;
+      console.warn(`SGN data source failed: ${source.mode}`, err);
+    }
   }
+
+  $('healthPill').className = 'health-pill error';
+  $('healthPill').innerHTML = '<i></i> ERROR';
+  $('errorBox').textContent = `Không đọc được dữ liệu SGN: ${lastError?.message || 'unknown error'}`;
+  $('errorBox').classList.remove('hidden');
+  $('refreshBtn').disabled = false;
 }
 
 $('directionTabs').addEventListener('click', e => {
