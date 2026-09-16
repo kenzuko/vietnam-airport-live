@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f8fb">
+  <title>Vietnam Airport Live - Tân Sơn Nhất (SGN)</title>
+  <meta name="description" content="Theo dõi chuyến bay đến và đi Tân Sơn Nhất (SGN): giờ dự kiến, độ trễ, nhà ga và trạng thái khai thác.">
+  <link rel="canonical" href="https://val.openphuquoc.com/">
+  <link rel="stylesheet" href="./style.css?v=20260916a">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Vietnam Airport Live">
+        <span class="brand-mark">VA</span>
+        <span class="brand-copy"><strong>Vietnam Airport Live</strong><small>SGN · Tân Sơn Nhất</small></span>
+      </a>
+      <button id="refreshBtn" class="refresh-btn" type="button" aria-label="Làm mới">↻</button>
+    </header>
+
+    <main class="page">
+      <div class="source-strip">
+        <span id="healthPill" class="health-pill loading"><i></i> LOADING</span>
+        <span id="sourceText">Đang đọc dữ liệu SGN...</span>
+        <span id="updatedAt" class="updated-at">-</span>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">SGN · TAN SON NHAT INTERNATIONAL AIRPORT</div>
+          <h1>Tân Sơn Nhất lúc này</h1>
+          <p>3 giây để biết sân bay đang ra sao.</p>
+        </div>
+        <div class="ops-card">
+          <span id="opsState">CHECKING</span>
+          <small id="opsDetail">Đang tổng hợp chuyến bay</small>
+        </div>
+        <div class="stats-grid">
+          <article><strong id="totalFlights">-</strong><span>Tổng chuyến</span></article>
+          <article><strong id="arrivalsCount">-</strong><span>Chuyến đến</span></article>
+          <article><strong id="departuresCount">-</strong><span>Chuyến đi</span></article>
+          <article><strong id="delayedCount">-</strong><span>Cần chú ý</span></article>
+        </div>
+      </section>
+
+      <div id="errorBox" class="error-box hidden"></div>
+
+      <section class="content-grid">
+        <div class="main-column">
+          <section class="card board-card">
+            <div class="card-head">
+              <div><span class="kicker">LIVE FLIGHT BOARD</span><h2>Chuyến bay hôm nay</h2></div>
+              <div class="terminal-tabs" id="terminalTabs">
+                <button class="active" data-terminal="all">Tất cả</button>
+                <button data-terminal="T1">T1</button>
+                <button data-terminal="T2">T2</button>
+                <button data-terminal="T3">T3</button>
+              </div>
+            </div>
+
+            <div class="search-wrap">
+              <input id="searchInput" type="search" autocomplete="off" placeholder="Tìm VN123, Hà Nội, Ha Noi, Seoul, ICN...">
+            </div>
+
+            <div class="direction-tabs" id="directionTabs">
+              <button class="active" data-direction="arrival">Chuyến đến</button>
+              <button data-direction="departure">Chuyến đi</button>
+              <button data-direction="all">Tất cả</button>
+            </div>
+
+            <div class="filter-tabs" id="filterTabs">
+              <button class="active" data-filter="all">Tất cả</button>
+              <button data-filter="next3">3 giờ tới</button>
+              <button data-filter="delayed">Trễ / thay đổi</button>
+              <button data-filter="international">Quốc tế</button>
+            </div>
+
+            <div id="flightList" class="flight-list"></div>
+          </section>
+        </div>
+
+        <aside class="sidebar">
+          <section class="card side-card">
+            <div class="side-head"><h3>Operations Watch</h3><span id="watchCount" class="count-pill">0</span></div>
+            <div id="watchList" class="watch-list"></div>
+          </section>
+
+          <section class="card side-card">
+            <div class="side-head"><h3>Data Health</h3><span id="qaBadge" class="qa-badge">...</span></div>
+            <div class="health-summary">
+              <div id="healthIcon" class="health-icon">⋯</div>
+              <div><strong id="healthTitle">CHECKING</strong><p id="healthDescription">Đang kiểm tra độ mới của dữ liệu.</p></div>
+            </div>
+            <dl class="health-meta">
+              <div><dt>Nguồn</dt><dd id="sourceName">-</dd></div>
+              <div><dt>Data age</dt><dd id="dataAge">-</dd></div>
+              <div><dt>Coverage</dt><dd id="coverage">-</dd></div>
+              <div><dt>Terminals</dt><dd id="terminals">-</dd></div>
+            </dl>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <footer>
+      <span>Vietnam Airport Live · JoTrip Lab</span>
+      <span>Dữ liệu dùng để tham khảo vận hành. Hãy xác nhận lại với hãng bay hoặc sân bay khi cần quyết định quan trọng.</span>
+    </footer>
+  </div>
+
+  <script src="./app.js?v=20260916a"></script>
+</body>
+</html>
