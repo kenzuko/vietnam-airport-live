@@ -38,6 +38,23 @@ jobs:
       - name: Collect official SGN data
         run: python scripts/collect_sgn.py
 
+      - name: Sanitize public metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('data/sgn.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          data['source'] = 'Live airport data'
+          for flight in data.get('flights', []):
+              flight['source'] = 'Live airport data'
+          path.write_text(
+              json.dumps(data, ensure_ascii=False, separators=(',', ':')),
+              encoding='utf-8'
+          )
+          PY
+
       - name: Commit refreshed dataset
         run: |
           if git diff --quiet -- data/sgn.json; then
