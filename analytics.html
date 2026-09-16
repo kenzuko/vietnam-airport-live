@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f5f3eb">
+  <meta name="theme-color" content="#f4f9ff">
   <title>Vietnam Airport Live - Thống kê SGN</title>
   <link rel="canonical" href="https://val.openphuquoc.com/analytics.html">
+  <link rel="icon" href="./assets/jotrip-logo.svg">
   <link rel="stylesheet" href="./style.css?v=20260916g">
-  <link rel="stylesheet" href="./theme-light.css?v=20260916a">
+  <link rel="stylesheet" href="./theme-light.css?v=20260916b">
 </head>
 <body>
 <header class="topbar">
@@ -20,11 +21,11 @@
 </header>
 <main class="subpage">
   <section class="subhero">
-    <div><span class="section-kicker">SGN · THỐNG KÊ</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp từ các chuyến hệ thống đã ghi nhận trong ngày. Số liệu này được tích lũy theo thời gian và khác với danh sách chuyến đang hiển thị ở trang Trực tiếp.</p></div>
+    <div><span class="section-kicker">SGN · THỐNG KÊ</span><h1>Thống kê & báo cáo nhanh</h1><p>Tổng hợp các chuyến hệ thống đã quan sát trong ngày, dùng để nhìn cơ cấu đường bay, khung giờ, nhà ga và mức độ thay đổi giờ.</p></div>
     <div id="coverageNote" class="coverage-note">Đang tải phạm vi dữ liệu...</div>
   </section>
   <section class="metric-grid">
-    <article><span>Đã ghi nhận</span><strong id="aTotal">-</strong></article>
+    <article><span>Đã quan sát</span><strong id="aTotal">-</strong></article>
     <article><span>Chuyến đến</span><strong id="aArrivals">-</strong></article>
     <article><span>Chuyến đi</span><strong id="aDepartures">-</strong></article>
     <article><span>Quốc tế</span><strong id="aInternational">-</strong></article>
@@ -35,7 +36,7 @@
     <div id="reportBox" class="report-box">Đang tổng hợp...</div>
   </section>
   <section class="section-card">
-    <span class="section-kicker">ĐƯỜNG BAY</span><h2>Điểm đi / đến được ghi nhận nhiều</h2>
+    <span class="section-kicker">ĐƯỜNG BAY</span><h2>Điểm đi / đến xuất hiện nhiều</h2>
     <div id="routeBars" class="bar-list"></div>
   </section>
   <section class="section-card">
@@ -43,7 +44,7 @@
     <div id="hourGrid" class="hour-grid"></div>
   </section>
   <section class="section-card">
-    <span class="section-kicker">NHÀ GA</span><h2>Phân bố theo nhà ga</h2>
+    <span class="section-kicker">NHÀ GA</span><h2>Phân bố theo T1 / T2 / T3</h2>
     <div id="terminalBars" class="bar-list"></div>
   </section>
 </main>
