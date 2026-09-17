@@ -56,6 +56,8 @@ jobs:
       - name: Refresh SGN live data
         shell: bash
         working-directory: live
+        env:
+          SGN_BASELINE_DAY: ../app/data/sgn-day.json
         run: |
           set -euo pipefail
           git config user.name 'vietnam-airport-live-bot'
