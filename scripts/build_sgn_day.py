@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -82,6 +83,28 @@ def git_versions_for_date(date_str):
     return out
 
 
+def baseline_day(date_str):
+    path = os.environ.get("SGN_BASELINE_DAY")
+    if not path:
+        return None
+    data = read_json(Path(path))
+    if not data or data.get("date") != date_str or not isinstance(data.get("flights"), list):
+        return None
+    return data
+
+
+def earliest_iso(*values):
+    valid = []
+    for value in values:
+        if not value:
+            continue
+        try:
+            valid.append((datetime.fromisoformat(value), value))
+        except Exception:
+            pass
+    return min(valid, key=lambda x: x[0])[1] if valid else next((v for v in values if v), None)
+
+
 def delayed(f):
     value = f.get("delay_minutes")
     try:
@@ -137,12 +160,18 @@ def main():
         archive_old_day(existing)
         existing = None
 
+    baseline = baseline_day(date_str)
     store = {}
-    first_seen = generated_at
-    if existing and isinstance(existing.get("flights"), list):
-        first_seen = existing.get("first_seen_at") or first_seen
-        for f in existing["flights"]:
-            merge_flight(store, f)
+    first_seen = earliest_iso(
+        baseline.get("first_seen_at") if baseline else None,
+        existing.get("first_seen_at") if existing else None,
+        generated_at,
+    )
+
+    for dataset in (baseline, existing):
+        if dataset and isinstance(dataset.get("flights"), list):
+            for f in dataset["flights"]:
+                merge_flight(store, f)
 
     for version in git_versions_for_date(date_str):
         for f in version.get("flights") or []:
@@ -187,7 +216,8 @@ def main():
     current.setdefault("summary", {})["feed_total"] = len(current.get("flights") or [])
     CURRENT.write_text(json.dumps(current, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     rebuild_history_index()
-    print(f"SGN day archive {date_str}: {summary['total']} observed flights; live window {len(current.get('flights') or [])}")
+    seed_note = " + baseline" if baseline else ""
+    print(f"SGN day archive {date_str}: {summary['total']} observed flights; live window {len(current.get('flights') or [])}{seed_note}")
 
 
 if __name__ == "__main__":
