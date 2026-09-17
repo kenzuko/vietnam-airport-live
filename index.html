@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://val.openphuquoc.com/">
   <link rel="icon" href="./assets/jotrip-logo.svg">
   <link rel="stylesheet" href="./style.css?v=20260916g">
-  <link rel="stylesheet" href="./theme-light.css?v=20260917a">
+  <link rel="stylesheet" href="./theme-light.css?v=20260917b">
 </head>
 <body>
   <div class="app-shell">
@@ -46,10 +46,10 @@
           <p id="opsDetail">Đang tổng hợp chuyến bay</p>
         </div>
         <div class="stats-grid">
-          <article class="today-stat"><small>ĐÃ GHI NHẬN</small><strong id="totalFlights">-</strong><span id="todayCoverage">Đang tích lũy dữ liệu</span></article>
-          <article><small>ĐANG THEO DÕI</small><strong id="liveWindowCount">-</strong><span>chuyến trong cửa sổ hiện tại</span></article>
-          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>trong cửa sổ hiện tại</span></article>
-          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>trong cửa sổ hiện tại</span></article>
+          <article class="today-stat"><small>ĐÃ GHI NHẬN TRONG NGÀY</small><strong id="totalFlights">-</strong><span id="todayCoverage">Đang tích lũy dữ liệu</span></article>
+          <article><small>BẢNG TẠI SÂN BAY</small><strong id="liveWindowCount">-</strong><span>chuyến đang hiển thị</span></article>
+          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>trên bảng tại sân bay</span></article>
+          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>trên bảng tại sân bay</span></article>
           <article class="attention-stat"><small>CẦN CHÚ Ý</small><strong id="delayedCount">-</strong><span>trễ hoặc đổi giờ</span></article>
         </div>
       </section>
@@ -82,8 +82,25 @@
       <section class="content-grid">
         <div class="main-column">
           <section class="card board-card" id="flightBoard">
+            <div class="dataset-tabs" id="datasetTabs" role="tablist" aria-label="Chọn loại bảng chuyến bay">
+              <button class="active" data-dataset="live" type="button">
+                <strong>Bảng tại sân bay</strong>
+                <span id="liveBoardTabStatus">Đang cập nhật</span>
+              </button>
+              <button data-dataset="day" type="button">
+                <strong>Lịch bay hôm nay</strong>
+                <span id="dayBoardTabStatus">Đang tích lũy</span>
+              </button>
+            </div>
+
+            <div class="board-context" id="boardContext">
+              <span class="kicker" id="boardKicker">BẢNG TẠI SÂN BAY</span>
+              <strong id="boardContextTitle">Các chuyến đang hiển thị tại sân bay</strong>
+              <p id="boardContextText">Ưu tiên thông tin đang có giá trị vận hành như giờ dự kiến, nhà ga, quầy, cổng và băng chuyền.</p>
+            </div>
+
             <div class="card-head">
-              <div><span class="kicker">BẢNG CHUYẾN BAY</span><h2>Các chuyến đang được cập nhật</h2><p>Tra theo chuyến, nơi đi / đến hoặc nhà ga.</p></div>
+              <div><h2 id="boardTitle">Chuyến bay đang được cập nhật</h2><p id="boardDescription">Tra theo chuyến, nơi đi / đến hoặc nhà ga.</p></div>
               <div class="terminal-tabs" id="terminalTabs">
                 <button class="active" data-terminal="all">Tất cả</button>
                 <button data-terminal="T1">T1</button>
@@ -128,7 +145,7 @@
             </div>
             <dl class="health-meta">
               <div><dt>Độ mới dữ liệu</dt><dd id="dataAge">-</dd></div>
-              <div><dt>Đang theo dõi</dt><dd id="coverage">-</dd></div>
+              <div><dt>Đang hiển thị</dt><dd id="coverage">-</dd></div>
               <div><dt>Nhà ga</dt><dd id="terminals">-</dd></div>
             </dl>
           </section>
@@ -152,7 +169,7 @@
     </nav>
   </div>
 
-  <script src="./app.js?v=20260917a"></script>
+  <script src="./app.js?v=20260917b"></script>
   <script src="./fast-refresh.js?v=20260916a"></script>
 </body>
 </html>
