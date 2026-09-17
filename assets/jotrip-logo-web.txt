@@ -1,1 +1,0 @@
-Binary PNG asset will be added via Git data API.
