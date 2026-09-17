@@ -1,9 +1,22 @@
-const DATA_SOURCES = [
-  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/data-live/data/sgn.json', mode: 'fresh' },
-  { url: './data/sgn.json', mode: 'pages-fallback' }
+const LIVE_DATA_SOURCES = [
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/data-live/data/sgn.json', mode: 'fresh-live' },
+  { url: './data/sgn.json', mode: 'pages-live-fallback' }
+];
+const DAY_DATA_SOURCES = [
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/data-live/data/sgn-day.json', mode: 'fresh-day' },
+  { url: './data/sgn-day.json', mode: 'pages-day-fallback' }
 ];
 
-const state = { data:null, direction:'arrival', terminal:'all', filter:'all', query:'', visibleLimit:30 };
+const state = {
+  liveData:null,
+  dayData:null,
+  dataset:'live',
+  direction:'arrival',
+  terminal:'all',
+  filter:'all',
+  query:'',
+  visibleLimit:30
+};
 const $ = id => document.getElementById(id);
 
 function normalizeText(value='') { return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim(); }
@@ -12,11 +25,13 @@ function codeshareText(f){ return (Array.isArray(f.flight_numbers)?f.flight_numb
 function flightSearchText(f){ return normalizeText([f.flight_number,codeshareText(f),f.airline,f.origin,f.destination,f.route_airport,f.status,f.terminal,f.gate,f.counter,f.belt].filter(Boolean).join(' ')); }
 function isDelayed(f){ const s=normalizeText(f.status); return Number(f.delay_minutes)>=15 || s.includes('tre') || s.includes('delay'); }
 function isAttention(f){ const s=normalizeText(f.status); return isDelayed(f) || s.includes('huy') || s.includes('cancel') || s.includes('doi cua') || s.includes('reschedul'); }
+function activeData(){ return state.dataset==='day' ? (state.dayData || state.liveData) : state.liveData; }
 
 function filteredFlights(){
-  if(!state.data?.flights) return [];
+  const data=activeData();
+  if(!data?.flights) return [];
   const q=normalizeText(state.query);
-  return state.data.flights.filter(f=>{
+  return data.flights.filter(f=>{
     if(state.direction!=='all'&&f.direction!==state.direction)return false;
     if(state.terminal!=='all'&&String(f.terminal||'').toUpperCase()!==state.terminal)return false;
     if(state.filter==='delayed'&&!isAttention(f))return false;
@@ -58,7 +73,50 @@ function flightRow(f){
   </article>`;
 }
 
+function timeLabel(value){
+  if(!value)return null;
+  try{return new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'}).format(new Date(value));}
+  catch{return null;}
+}
+
+function renderBoardContext(){
+  const live=state.liveData;
+  const day=state.dayData;
+  const liveCount=live?.summary?.feed_total ?? live?.summary?.total ?? live?.flights?.length ?? 0;
+  const dayCount=day?.summary?.total ?? day?.flights?.length ?? 0;
+  const firstSeen=timeLabel(day?.first_seen_at);
+  $('liveBoardTabStatus').textContent=liveCount?`${liveCount} chuyến đang hiển thị`:'Đang cập nhật';
+  if(day?.complete_day){
+    $('dayBoardTabStatus').textContent=`${dayCount} chuyến · đủ từ đầu ngày`;
+  }else if(dayCount){
+    $('dayBoardTabStatus').textContent=`${dayCount} chuyến đã ghi nhận`;
+  }else{
+    $('dayBoardTabStatus').textContent='Đang tích lũy';
+  }
+
+  if(state.dataset==='live'){
+    $('boardKicker').textContent='BẢNG TẠI SÂN BAY';
+    $('boardContextTitle').textContent='Các chuyến đang hiển thị tại sân bay';
+    $('boardContextText').textContent='Ưu tiên giờ dự kiến, nhà ga, quầy, cổng, băng chuyền và trạng thái đang có giá trị vận hành.';
+    $('boardTitle').textContent='Chuyến bay đang được cập nhật';
+    $('boardDescription').textContent='Đây là cửa sổ chuyến quanh thời điểm hiện tại, không phải toàn bộ lịch bay trong ngày.';
+  }else{
+    $('boardKicker').textContent='LỊCH BAY HÔM NAY';
+    $('boardContextTitle').textContent='Các chuyến hệ thống đã ghi nhận trong ngày';
+    if(day?.complete_day){
+      $('boardContextText').textContent='Dữ liệu đã được ghi nhận từ đầu ngày và tiếp tục cập nhật trạng thái trong quá trình khai thác.';
+    }else if(firstSeen){
+      $('boardContextText').textContent=`Đang tích lũy từ ${firstSeen}. Chưa thể xem đây là toàn bộ lịch 00:00-23:59 cho tới khi có nguồn lịch ngày đầy đủ.`;
+    }else{
+      $('boardContextText').textContent='Đang xây dựng lịch bay cả ngày. Khi chưa đủ dữ liệu, hệ thống sẽ ghi rõ mức độ phủ.';
+    }
+    $('boardTitle').textContent='Lịch chuyến đã ghi nhận hôm nay';
+    $('boardDescription').textContent='Dùng để tra cứu rộng hơn bảng tại sân bay, nhưng mức độ đầy đủ phụ thuộc thời điểm hệ thống bắt đầu thu thập.';
+  }
+}
+
 function renderBoard(){
+  renderBoardContext();
   const all=filteredFlights();
   const shown=all.slice(0,state.visibleLimit);
   $('flightList').innerHTML=shown.length?shown.map(flightRow).join(''):`<div class="empty-state">Không có chuyến phù hợp với bộ lọc hiện tại.</div>`;
@@ -68,8 +126,8 @@ function renderBoard(){
 }
 
 function renderWatch(){
-  const flights=(state.data?.flights||[]).filter(isAttention).sort((a,b)=>(Number(b.delay_minutes)||0)-(Number(a.delay_minutes)||0)).slice(0,10);
-  $('watchCount').textContent=(state.data?.flights||[]).filter(isAttention).length;
+  const flights=(state.liveData?.flights||[]).filter(isAttention).sort((a,b)=>(Number(b.delay_minutes)||0)-(Number(a.delay_minutes)||0)).slice(0,10);
+  $('watchCount').textContent=(state.liveData?.flights||[]).filter(isAttention).length;
   $('watchList').innerHTML=flights.length?flights.map(f=>{
     const delay=Number(f.delay_minutes); const extra=Number.isFinite(delay)&&delay>=10?` · +${delay} phút`:'';
     return `<div class="watch-item"><strong>${esc(f.flight_number)} · ${esc(f.route_airport||'-')}</strong><span>${esc(displayStatus(f))}${esc(extra)}</span></div>`;
@@ -84,21 +142,16 @@ function ageInfo(generatedAt){
   if(mins<60)return{minutes:mins,label:`${mins} phút`};
   return{minutes:mins,label:`${Math.floor(mins/60)} giờ ${mins%60} phút`};
 }
-function timeLabel(value){
-  if(!value)return null;
-  try{return new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'}).format(new Date(value));}
-  catch{return null;}
-}
 
 function renderOverview(){
-  const flights=state.data?.flights||[];
+  const flights=state.liveData?.flights||[];
   const domestic=flights.filter(f=>!f.is_international).length;
   const international=flights.filter(f=>f.is_international).length;
   const total=flights.length||1;
   $('domesticNow').textContent=domestic;
   $('internationalNow').textContent=international;
-  $('domesticPct').textContent=`${Math.round(domestic/total*100)}% cửa sổ hiện tại`;
-  $('internationalPct').textContent=`${Math.round(international/total*100)}% cửa sổ hiện tại`;
+  $('domesticPct').textContent=`${Math.round(domestic/total*100)}% bảng hiện tại`;
+  $('internationalPct').textContent=`${Math.round(international/total*100)}% bảng hiện tại`;
 
   const terminalCounts=['T1','T2','T3'].map(t=>({t,n:flights.filter(f=>f.terminal===t).length}));
   const max=Math.max(1,...terminalCounts.map(x=>x.n));
@@ -111,23 +164,23 @@ function renderOverview(){
 }
 
 function renderSummary(){
-  const d=state.data; const s=d?.summary||{}; const day=d?.day_summary||{};
-  const feedTotal=Number(s.feed_total??s.total??0);
-  const dayTotal=Number(day.total??feedTotal);
-  const firstSeen=timeLabel(day.first_seen_at);
+  const d=state.liveData; const s=d?.summary||{}; const day=state.dayData||d?.day_summary||{};
+  const feedTotal=Number(s.feed_total??s.total??d?.flights?.length??0);
+  const dayTotal=Number(day?.summary?.total??day?.total??feedTotal);
+  const firstSeen=timeLabel(day?.first_seen_at);
 
   $('totalFlights').textContent=dayTotal;
   $('liveWindowCount').textContent=feedTotal;
   $('arrivalsCount').textContent=s.arrivals??0;
   $('departuresCount').textContent=s.departures??0;
   $('delayedCount').textContent=s.delayed??0;
-  $('todayCoverage').textContent=day.complete_day?'ghi nhận từ đầu ngày':(firstSeen?`ghi nhận từ ${firstSeen}`:'đang tích lũy');
+  $('todayCoverage').textContent=day?.complete_day?'ghi nhận từ đầu ngày':(firstSeen?`đã ghi nhận từ ${firstSeen}`:'đang tích lũy');
 
   const total=feedTotal, delayed=Number(s.delayed)||0, ratio=total?delayed/total:0;
   if(!total){$('opsState').textContent='ĐANG CHỜ';$('opsDetail').textContent='Chờ đồng bộ dữ liệu';}
   else if(ratio>=.18){$('opsState').textContent='CẦN CHÚ Ý';$('opsDetail').textContent=`${delayed} chuyến đang trễ hoặc đổi giờ`;}
   else if(delayed>0){$('opsState').textContent='CÓ THAY ĐỔI';$('opsDetail').textContent=`${delayed} chuyến đang trễ hoặc đổi giờ`;}
-  else{$('opsState').textContent='BÌNH THƯỜNG';$('opsDetail').textContent='Chưa thấy trễ đáng kể trong cửa sổ hiện tại';}
+  else{$('opsState').textContent='BÌNH THƯỜNG';$('opsDetail').textContent='Chưa thấy trễ đáng kể trên bảng hiện tại';}
 
   $('coverage').textContent=`${feedTotal} chuyến`;
   $('terminals').textContent=(s.terminals||[]).join(', ')||'-';
@@ -138,7 +191,8 @@ function renderSummary(){
   const pill=$('healthPill'); pill.className='health-pill';
   if(!total){pill.classList.add('loading');pill.innerHTML='<i></i> ĐANG CHỜ';$('qaBadge').textContent='CHỜ';$('healthTitle').textContent='CHƯA CÓ DỮ LIỆU';$('healthDescription').textContent='Chưa nhận được bộ dữ liệu SGN hợp lệ.';$('healthIcon').textContent='⋯';}
   else if(age.minutes>10){pill.classList.add('stale');pill.innerHTML='<i></i> CHẬM';$('qaBadge').textContent='CHẬM';$('healthTitle').textContent='DỮ LIỆU ĐANG CHẬM';$('healthDescription').textContent='Dữ liệu đã cũ hơn 10 phút. Nên kiểm tra lại trước khi sử dụng.';$('healthIcon').textContent='!';}
-  else{pill.innerHTML='<i></i> TRỰC TIẾP';$('qaBadge').textContent='TỐT';$('healthTitle').textContent='DỮ LIỆU ĐANG HOẠT ĐỘNG';$('healthDescription').textContent='Luồng SGN đang cập nhật bình thường.';$('healthIcon').textContent='✓';}
+  else{pill.innerHTML='<i></i> TRỰC TIẾP';$('qaBadge').textContent='TỐT';$('healthTitle').textContent='DỮ LIỆU ĐANG HOẠT ĐỘNG';$('healthDescription').textContent='Bảng tại sân bay đang cập nhật bình thường.';$('healthIcon').textContent='✓';}
+  renderBoardContext();
 }
 
 function setActive(container,key,value){ container.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active',btn.dataset[key]===value)); }
@@ -153,21 +207,39 @@ async function fetchJsonWithTimeout(url,timeoutMs=7000){
     return data;
   }finally{clearTimeout(timer);}
 }
-
-async function loadData(){
-  $('refreshBtn').disabled=true; $('errorBox').classList.add('hidden'); let lastError=null;
-  for(const source of DATA_SOURCES){
-    try{
-      const candidate=await fetchJsonWithTimeout(source.url);
-      if(!state.data || !state.data.generated_at || new Date(candidate.generated_at)>=new Date(state.data.generated_at)) state.data=candidate;
-      renderSummary();renderOverview();renderBoard();renderWatch();$('refreshBtn').disabled=false;return;
-    }catch(err){lastError=err;console.warn('SGN data source failed',source.mode,err);}
+async function fetchFirst(sources){
+  let lastError=null;
+  for(const source of sources){
+    try{return await fetchJsonWithTimeout(source.url);}
+    catch(err){lastError=err;console.warn('SGN data source failed',source.mode,err);}
   }
-  $('healthPill').className='health-pill error';$('healthPill').innerHTML='<i></i> LỖI';
-  $('errorBox').textContent=`Không đọc được dữ liệu SGN: ${lastError?.message||'lỗi không xác định'}`;
-  $('errorBox').classList.remove('hidden');$('refreshBtn').disabled=false;
+  throw lastError||new Error('Không đọc được dữ liệu');
 }
 
+async function loadData(){
+  $('refreshBtn').disabled=true; $('errorBox').classList.add('hidden');
+  let liveError=null;
+  try{
+    const candidate=await fetchFirst(LIVE_DATA_SOURCES);
+    if(!state.liveData || !state.liveData.generated_at || new Date(candidate.generated_at)>=new Date(state.liveData.generated_at)) state.liveData=candidate;
+  }catch(err){liveError=err;}
+
+  if(state.liveData){
+    renderSummary();renderOverview();renderBoard();renderWatch();
+    fetchFirst(DAY_DATA_SOURCES).then(day=>{
+      state.dayData=day;
+      renderSummary();
+      if(state.dataset==='day')renderBoard();
+    }).catch(err=>console.warn('SGN day dataset failed',err));
+  }else{
+    $('healthPill').className='health-pill error';$('healthPill').innerHTML='<i></i> LỖI';
+    $('errorBox').textContent=`Không đọc được dữ liệu SGN: ${liveError?.message||'lỗi không xác định'}`;
+    $('errorBox').classList.remove('hidden');
+  }
+  $('refreshBtn').disabled=false;
+}
+
+$('datasetTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-dataset]');if(!btn)return;state.dataset=btn.dataset.dataset;state.visibleLimit=30;setActive($('datasetTabs'),'dataset',state.dataset);renderBoard();});
 $('directionTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-direction]');if(!btn)return;state.direction=btn.dataset.direction;state.visibleLimit=30;setActive($('directionTabs'),'direction',state.direction);renderBoard();});
 $('terminalTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-terminal]');if(!btn)return;state.terminal=btn.dataset.terminal;state.visibleLimit=30;setActive($('terminalTabs'),'terminal',state.terminal);renderBoard();});
 $('filterTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-filter]');if(!btn)return;state.filter=btn.dataset.filter;state.visibleLimit=30;setActive($('filterTabs'),'filter',state.filter);renderBoard();});
