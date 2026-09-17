@@ -133,6 +133,59 @@ async def switch_terminal(page: Page, terminal: str, terminal_num: str) -> list[
     raise RuntimeError(f"terminal {terminal} did not load")
 
 
+def pager_button_is_page_two(meta: dict[str, Any]) -> bool:
+    text = (meta.get("text") or "").strip().lower()
+    title = (meta.get("title") or "").strip().lower()
+    aria = (meta.get("aria") or "").strip().lower()
+    combined = f"{text} {title} {aria}"
+    return text == "2" or "page 2" in combined or "trang 2" in combined
+
+
+async def go_page_two(page: Page, terminal_num: str, first_signature: tuple[str, ...]) -> bool:
+    pager = page.locator(".k-pager:visible").first
+    if await pager.count() == 0:
+        return False
+
+    buttons = pager.locator("button, a")
+    clicked = False
+    for i in range(await buttons.count()):
+        button = buttons.nth(i)
+        meta = {
+            "text": await button.inner_text(),
+            "title": await button.get_attribute("title"),
+            "aria": await button.get_attribute("aria-label"),
+            "disabled": await button.get_attribute("aria-disabled"),
+        }
+        if pager_button_is_page_two(meta) and meta["disabled"] != "true":
+            try:
+                await button.click(timeout=4000)
+                clicked = True
+                break
+            except Exception:
+                pass
+
+    if not clicked:
+        inputs = pager.locator("input")
+        if await inputs.count():
+            try:
+                inp = inputs.first
+                await inp.fill("2")
+                await inp.press("Enter")
+                clicked = True
+            except Exception:
+                return False
+
+    if not clicked:
+        return False
+
+    for _ in range(12):
+        await page.wait_for_timeout(450)
+        rows = await terminal_rows(page, terminal_num)
+        if rows and tuple(rows[0][:5]) != first_signature:
+            return True
+    return False
+
+
 def parse_row(direction: str, terminal: str, cells: list[str]) -> dict[str, Any] | None:
     if direction == "arrival":
         if len(cells) < 7:
@@ -188,6 +241,19 @@ def merge(store: dict[str, dict[str, Any]], item: dict[str, Any]) -> None:
             old[field] = item[field]
 
 
+async def sample_current_page(page: Page, direction: str, terminal: str, terminal_num: str, store: dict[str, dict[str, Any]], samples: int = 2) -> int:
+    before = len(store)
+    for sample in range(samples):
+        rows = await terminal_rows(page, terminal_num)
+        for row in rows:
+            item = parse_row(direction, terminal, row)
+            if item:
+                merge(store, item)
+        if sample < samples - 1:
+            await page.wait_for_timeout(650)
+    return len(store) - before
+
+
 async def collect_direction(context, direction: str) -> tuple[dict[str, dict[str, Any]], list[str]]:
     page = await context.new_page()
     store: dict[str, dict[str, Any]] = {}
@@ -196,17 +262,18 @@ async def collect_direction(context, direction: str) -> tuple[dict[str, dict[str
         await page.goto(URLS[direction], wait_until="domcontentloaded", timeout=25000)
         await wait_initial_grid(page, direction)
         for terminal, num in TERMINALS:
-            await switch_terminal(page, terminal, num)
+            first_rows = await switch_terminal(page, terminal, num)
+            first_signature = tuple(first_rows[0][:5])
             before = len(store)
-            for sample in range(2):
-                rows = await terminal_rows(page, num)
-                for row in rows:
-                    item = parse_row(direction, terminal, row)
-                    if item:
-                        merge(store, item)
-                if sample == 0:
-                    await page.wait_for_timeout(650)
-            notes.append(f"{direction}/{terminal}={len(store)-before}")
+            await sample_current_page(page, direction, terminal, num, store, samples=2)
+            pages = 1
+            try:
+                if await go_page_two(page, num, first_signature):
+                    await sample_current_page(page, direction, terminal, num, store, samples=2)
+                    pages = 2
+            except Exception as exc:
+                notes.append(f"{direction}/{terminal}/pager={type(exc).__name__}")
+            notes.append(f"{direction}/{terminal}={len(store)-before} pages={pages}")
     finally:
         await page.close()
     return store, notes
@@ -255,7 +322,7 @@ def write_dataset(flights: list[dict[str, Any]], generated: datetime) -> None:
         "date": generated.date().isoformat(),
         "generated_at": generated.isoformat(timespec="seconds"),
         "source": "Live airport data",
-        "coverage": "T1, T2, T3 - current live window",
+        "coverage": "T1, T2, T3 - current airport display window",
         "summary": {"total": len(flights), "arrivals": arrivals, "departures": departures, "delayed": delayed, "terminals": ["T1", "T2", "T3"]},
         "flights": flights,
     }
