@@ -1,0 +1,1 @@
+JoTrip logo asset source is supplied by the project owner. Do not redraw or alter the wordmark proportions.
