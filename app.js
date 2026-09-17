@@ -1,5 +1,5 @@
 const DATA_SOURCES = [
-  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/main/data/sgn.json', mode: 'fresh' },
+  { url: 'https://raw.githubusercontent.com/kenzuko/vietnam-airport-live/data-live/data/sgn.json', mode: 'fresh' },
   { url: './data/sgn.json', mode: 'pages-fallback' }
 ];
 
