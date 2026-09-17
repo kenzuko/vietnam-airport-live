@@ -1,1 +1,1 @@
-{"days":[{"date":"2026-09-16","file":"./history/2026-09-16.json","summary":{"total":127,"arrivals":68,"departures":59,"international":47,"delayed":38,"terminals":["T1","T2","T3"]}}]}
+{"days":[{"date":"2026-09-17","file":"./history/2026-09-17.json","summary":{"total":424,"arrivals":200,"departures":224,"international":167,"delayed":81,"terminals":["T1","T2","T3"]}},{"date":"2026-09-16","file":"./history/2026-09-16.json","summary":{"total":127,"arrivals":68,"departures":59,"international":47,"delayed":38,"terminals":["T1","T2","T3"]}}]}
