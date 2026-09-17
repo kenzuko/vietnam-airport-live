@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f4f9ff">
+  <meta name="theme-color" content="#f4f1ea">
   <title>Vietnam Airport Live - Tân Sơn Nhất (SGN)</title>
-  <meta name="description" content="Theo dõi chuyến bay đến và đi Tân Sơn Nhất (SGN): giờ dự kiến, độ trễ, nhà ga, chuyến sắp tới và tình hình khai thác.">
+  <meta name="description" content="Theo dõi chuyến bay đến và đi Tân Sơn Nhất (SGN): giờ dự kiến, độ trễ, nhà ga và tình hình khai thác.">
   <link rel="canonical" href="https://val.openphuquoc.com/">
-  <link rel="icon" href="https://raw.githubusercontent.com/kenzuko/Jotrip-Airport/main/jotrip-logo-master.png">
+  <link rel="icon" href="./assets/jotrip-logo.svg">
   <link rel="stylesheet" href="./style.css?v=20260916g">
-  <link rel="stylesheet" href="./theme-light.css?v=20260916b">
+  <link rel="stylesheet" href="./theme-light.css?v=20260917a">
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="./" aria-label="Vietnam Airport Live">
-        <img class="brand-logo" src="https://raw.githubusercontent.com/kenzuko/Jotrip-Airport/main/jotrip-logo-master.png" alt="JoTrip">
+        <img class="brand-logo" src="./assets/jotrip-logo.svg" alt="JoTrip">
         <span class="brand-divider"></span>
         <span class="brand-copy"><strong>Vietnam Airport Live</strong><small>SGN · Tân Sơn Nhất</small></span>
       </a>
@@ -30,16 +30,15 @@
     <main class="page">
       <div class="source-strip">
         <span id="healthPill" class="health-pill loading"><i></i> ĐANG TẢI</span>
-        <span class="live-label">SGN · TỰ ĐỘNG KIỂM TRA 15 GIÂY</span>
+        <span class="live-label">SGN · CẬP NHẬT TỰ ĐỘNG</span>
         <span id="updatedAt" class="updated-at">-</span>
       </div>
 
       <section class="hero">
-        <div class="runway-lines" aria-hidden="true"></div>
         <div class="hero-copy">
           <div class="eyebrow">SGN · TAN SON NHAT INTERNATIONAL AIRPORT</div>
           <h1>Tân Sơn Nhất<br><span>lúc này</span></h1>
-          <p>Chuyến nào sắp đến, chuyến nào sắp đi, chuyến nào đang trễ - xem nhanh ngay tại đây.</p>
+          <p>Xem nhanh chuyến đến, chuyến đi, giờ dự kiến và những chuyến đang có thay đổi.</p>
         </div>
         <div class="ops-card">
           <small>TÌNH HÌNH KHAI THÁC</small>
@@ -47,37 +46,35 @@
           <p id="opsDetail">Đang tổng hợp chuyến bay</p>
         </div>
         <div class="stats-grid">
-          <article class="today-stat"><small>ĐÃ QUAN SÁT HÔM NAY</small><strong id="totalFlights">-</strong><span id="todayCoverage">Đang tích lũy dữ liệu</span></article>
-          <article><small>ĐANG THEO DÕI</small><strong id="liveWindowCount">-</strong><span>chuyến trong dữ liệu hiện tại</span></article>
-          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>đang có trong luồng live</span></article>
-          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>đang có trong luồng live</span></article>
-          <article class="attention-stat"><small>CẦN CHÚ Ý</small><strong id="delayedCount">-</strong><span>trễ hoặc thay đổi giờ</span></article>
+          <article class="today-stat"><small>ĐÃ GHI NHẬN</small><strong id="totalFlights">-</strong><span id="todayCoverage">Đang tích lũy dữ liệu</span></article>
+          <article><small>ĐANG THEO DÕI</small><strong id="liveWindowCount">-</strong><span>chuyến trong cửa sổ hiện tại</span></article>
+          <article><small>CHUYẾN ĐẾN</small><strong id="arrivalsCount">-</strong><span>trong cửa sổ hiện tại</span></article>
+          <article><small>CHUYẾN ĐI</small><strong id="departuresCount">-</strong><span>trong cửa sổ hiện tại</span></article>
+          <article class="attention-stat"><small>CẦN CHÚ Ý</small><strong id="delayedCount">-</strong><span>trễ hoặc đổi giờ</span></article>
         </div>
       </section>
 
-      <section class="dashboard-band">
-        <section class="card pulse-card">
-          <div class="pulse-head">
-            <div><span class="kicker">NHỊP SÂN BAY</span><h2>3 giờ tới tại SGN</h2><p>Nhìn nhanh lượng chuyến sắp đến, sắp đi và các thay đổi đáng chú ý.</p></div>
-            <span id="pulseClock" class="pulse-clock">-</span>
+      <section class="overview-grid">
+        <article class="card overview-card">
+          <span class="kicker">CƠ CẤU HIỆN TẠI</span>
+          <h2>Nội địa & quốc tế</h2>
+          <div class="market-ledger">
+            <div><span>Nội địa</span><strong id="domesticNow">-</strong><small id="domesticPct">-</small></div>
+            <div><span>Quốc tế</span><strong id="internationalNow">-</strong><small id="internationalPct">-</small></div>
           </div>
-          <div id="opsNarrative" class="ops-narrative">Đang tổng hợp tình hình 3 giờ tới...</div>
-          <div class="pulse-metrics">
-            <article><span>60 phút tới</span><strong id="nextHourTotal">-</strong><small>chuyến đến + đi</small></article>
-            <article><span>Đến trong 3 giờ</span><strong id="next3Arrivals">-</strong><small>chuyến sắp hạ cánh</small></article>
-            <article><span>Đi trong 3 giờ</span><strong id="next3Departures">-</strong><small>chuyến sắp khởi hành</small></article>
-            <article><span>Có thay đổi</span><strong id="next3Changed">-</strong><small>trong 3 giờ tới</small></article>
-          </div>
-        </section>
+        </article>
 
-        <section class="card snapshot-card">
-          <div class="snapshot-head"><div><span class="kicker">BỨC TRANH HIỆN TẠI</span><h2>Nội địa, quốc tế & tuyến bay</h2><p>Tính trên các chuyến đang được theo dõi.</p></div></div>
-          <div class="market-split">
-            <div class="market-box domestic"><span>Nội địa</span><strong id="domesticNow">-</strong><small id="domesticPct">-</small></div>
-            <div class="market-box international"><span>Quốc tế</span><strong id="internationalNow">-</strong><small id="internationalPct">-</small></div>
-          </div>
+        <article class="card overview-card">
+          <span class="kicker">NHÀ GA</span>
+          <h2>T1 · T2 · T3</h2>
+          <div id="terminalPulse" class="terminal-pulse"></div>
+        </article>
+
+        <article class="card overview-card routes-card">
+          <span class="kicker">TUYẾN ĐANG XUẤT HIỆN NHIỀU</span>
+          <h2>Điểm đi / đến</h2>
           <div id="routeHighlights" class="route-highlights"></div>
-        </section>
+        </article>
       </section>
 
       <div id="errorBox" class="error-box hidden"></div>
@@ -86,7 +83,7 @@
         <div class="main-column">
           <section class="card board-card" id="flightBoard">
             <div class="card-head">
-              <div><span class="kicker">BẢNG CHUYẾN BAY</span><h2>Các chuyến đang được cập nhật</h2><p>Dùng bộ lọc để xem chuyến đến, chuyến đi, nhà ga hoặc các chuyến đang trễ.</p></div>
+              <div><span class="kicker">BẢNG CHUYẾN BAY</span><h2>Các chuyến đang được cập nhật</h2><p>Tra theo chuyến, nơi đi / đến hoặc nhà ga.</p></div>
               <div class="terminal-tabs" id="terminalTabs">
                 <button class="active" data-terminal="all">Tất cả</button>
                 <button data-terminal="T1">T1</button>
@@ -107,7 +104,6 @@
 
             <div class="filter-tabs" id="filterTabs">
               <button class="active" data-filter="all">Tất cả</button>
-              <button data-filter="next3">3 giờ tới</button>
               <button data-filter="delayed">Trễ / thay đổi</button>
               <button data-filter="domestic">Nội địa</button>
               <button data-filter="international">Quốc tế</button>
@@ -119,19 +115,9 @@
         </div>
 
         <aside class="sidebar">
-          <section class="card side-card next-card">
-            <div class="side-head"><h3>Chuyến sắp đến</h3><span class="count-pill">SGN</span></div>
-            <div id="nextArrivalsList" class="next-arrivals-list"></div>
-          </section>
-
           <section class="card side-card watch-card">
             <div class="side-head"><h3>Chuyến cần chú ý</h3><span id="watchCount" class="count-pill">0</span></div>
             <div id="watchList" class="watch-list"></div>
-          </section>
-
-          <section class="card side-card terminal-card">
-            <div class="side-head"><h3>Nhịp theo nhà ga</h3><span class="count-pill">T1 · T2 · T3</span></div>
-            <div id="terminalPulse" class="terminal-pulse"></div>
           </section>
 
           <section class="card side-card">
@@ -166,7 +152,7 @@
     </nav>
   </div>
 
-  <script src="./app.js?v=20260916i"></script>
+  <script src="./app.js?v=20260917a"></script>
   <script src="./fast-refresh.js?v=20260916a"></script>
 </body>
 </html>
