@@ -1,0 +1,66 @@
+name: Collect SGN schedule baseline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 1,9,17 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect-sgn-baseline
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout application code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: app
+          fetch-depth: 1
+
+      - name: Checkout live data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data-live
+          path: live
+          fetch-depth: 1
+
+      - name: Check configuration
+        id: config
+        shell: bash
+        env:
+          AIRLABS_API_KEY: ${{ secrets.AIRLABS_API_KEY }}
+        run: |
+          if [ -z "${AIRLABS_API_KEY}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "AIRLABS_API_KEY is not configured - skipping without error."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect baseline
+        if: steps.config.outputs.enabled == 'true'
+        shell: bash
+        env:
+          AIRLABS_API_KEY: ${{ secrets.AIRLABS_API_KEY }}
+        run: |
+          mkdir -p live/scripts
+          cp app/scripts/collect_sgn_airlabs.py live/scripts/
+          cd live
+          python scripts/collect_sgn_airlabs.py
+
+          git config user.name 'vietnam-airport-live-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/sgn-baseline.json
+          if git diff --cached --quiet; then
+            echo 'No baseline change.'
+          else
+            git commit -m 'data: refresh SGN schedule baseline'
+            git push origin HEAD:data-live
+          fi
