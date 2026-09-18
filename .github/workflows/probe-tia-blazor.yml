@@ -27,14 +27,7 @@ jobs:
           from playwright.async_api import async_playwright
 
           BASE='https://tia.vietnamairport.vn/ArrDom'
-          variants=[
-            ('base',''),
-            ('pageSize','?pageSize=100'),
-            ('take','?take=100'),
-            ('date','?date=2026-09-18'),
-            ('flightDate','?flightDate=2026-09-18'),
-            ('range','?from=00%3A00&to=23%3A59'),
-          ]
+          variants=[('base',''),('pageSize','?pageSize=100'),('flightDate','?flightDate=2026-09-18')]
 
           async def rows(page):
               out=[]
@@ -47,7 +40,7 @@ jobs:
               return out
 
           async def wait_rows(page):
-              for _ in range(24):
+              for _ in range(60):
                   r=await rows(page)
                   if r: return r
                   await page.wait_for_timeout(400)
