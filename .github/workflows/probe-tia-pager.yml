@@ -21,4 +21,6 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - name: Inspect TIA grid pagination
-        run: python scripts/probe_tia_browser.py
+        run: |
+          sed -i 's/p.chromium.launch(headless=True)/p.chromium.launch(channel="chrome", headless=True)/' scripts/probe_tia_browser.py
+          python scripts/probe_tia_browser.py
