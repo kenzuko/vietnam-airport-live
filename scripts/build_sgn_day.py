@@ -190,8 +190,11 @@ def main():
 
     complete_day = False
     try:
-        dt = datetime.fromisoformat(first_seen)
-        complete_day = dt.hour == 0 and dt.minute <= 30
+        first_dt = datetime.fromisoformat(first_seen)
+        last_dt = datetime.fromisoformat(generated_at)
+        started_near_midnight = first_dt.hour == 0 and first_dt.minute <= 30
+        reached_end_of_day = last_dt.hour == 23 and last_dt.minute >= 30
+        complete_day = started_near_midnight and reached_end_of_day
     except Exception:
         pass
 
@@ -201,7 +204,7 @@ def main():
         "first_seen_at": first_seen,
         "last_seen_at": generated_at,
         "complete_day": complete_day,
-        "coverage_note": "Observed flights accumulated from live airport data. A day is marked complete only when collection started near midnight.",
+        "coverage_note": "Observed flights accumulated from the live airport display. A day is marked complete only when collection spans from near midnight through at least 23:30.",
         "summary": summary,
         "flights": flights,
     }
